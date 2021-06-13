@@ -1,11 +1,15 @@
+from numbers import Number
 import types
 from typing import Union, NoReturn
 from . import exception
 
 import heapq
 from typing import Coroutine
+from contextlib import contextmanager
+
 
 OptionalCoroutine = Union[Coroutine, None]
+OptionalEnvironment = Union['Environment', None]
 
 class Task:
     def __init__(self, coro: Coroutine, wait_until=None, callbacks=None):
@@ -30,11 +34,11 @@ class Task:
     def __lt__(self, other):
         return self.wait_until < other.wait_until
 
-def get_current_env():
-    return Environment.current()
+def get_active_env():
+    return Environment._activae_env
 
-def get_running_task():
-    return get_current_env()._runnint_task
+def get_active_task():
+    return get_active_env()._active_task
 
 class EmptyTask(Task):
     def __init__(self, wait_until=None, callbacks=None):
@@ -42,7 +46,7 @@ class EmptyTask(Task):
 
 
 class Environment:
-    _env_stack = []
+    _activae_env: OptionalEnvironment = None
 
     def __init__(self, coros, initial_time=0) -> None:
         self.now = initial_time
@@ -79,30 +83,25 @@ class Environment:
     def sleep(self, delay):
         return sleep(self.now, delay)
 
-    def __enter__(self):
-        type(self)._env_stack.append(self)
-        return self
+@contextmanager
+def create_env(coros: list[Coroutine], initial_time: Number = None):
+    pre_env = Environment._activae_env
+    env = Environment(coros, initial_time)
+    Environment._activae_env = env
+    yield env
+    Environment._activae_env = pre_env
 
-    def __exit__(self, type, value, traceback):
-        self._env_stack.pop()
-
-    @classmethod
-    def current(cls) -> 'Environment':
-        if cls._env_stack:
-            return cls._env_stack[-1]
-        else:
-            raise exception.NoCurrentEnvironmentError 
-
+    
 async def sleep(delay, env: 'Environment' = None):
     if env is None:
-        env = get_current_env()
+        env = get_active_env()
     
     return await env.start_task(EmptyTask(), delay)
 
 
 async def gather(*coros, env: 'Environment' = None):
     if env is None:
-        env = get_current_env()
+        env = get_active_env()
     coro_num = len(coros)
     done_num = 0
     gathering_task = EmptyTask()
