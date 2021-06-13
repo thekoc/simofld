@@ -1,0 +1,2 @@
+class NoCurrentEnvironmentError(Exception):
+    pass
