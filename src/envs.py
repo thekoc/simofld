@@ -1,11 +1,12 @@
 from numbers import Number
 import types
-from typing import Union, NoReturn, List
+from typing import Optional, Union, NoReturn, List
 from . import exception
 
 import heapq
 from typing import Coroutine
 from contextlib import contextmanager
+from functools import wraps
 
 
 OptionalCoroutine = Union[Coroutine, None]
@@ -39,7 +40,10 @@ class Task:
         return self.wait_until < other.wait_until
 
 def get_active_env():
-    return Environment._activae_env
+    if Environment._activae_env is not None:
+        return Environment._activae_env
+    else:
+        raise exception.NoCurrentEnvironmentError
 
 def get_active_task():
     return get_active_env()._active_task
@@ -59,13 +63,19 @@ class Environment:
         self._running_tasks: TaskList = [Task(coro, wait_until=self.now) for coro in coros] # type: list[Task]
         self.prev_env: OptionalEnvironment = None
 
-    def start_task(self, task: Task, delay=None):
+    def start_task(self, task: Task, delay: Optional[Number] = None):
         if delay is None:
             task.wait_until = self.now
         else:
             task.wait_until = self.now + delay
 
         heapq.heappush(self._running_tasks, task)
+        return task
+    
+    def create_task(self, coro: Coroutine, wait_until=None, callbacks=None, start=True):
+        task = Task(coro=coro, wait_until=wait_until, callbacks=callbacks)
+        if start:
+            self.start_task(task)
         return task
 
     def run(self):
@@ -88,19 +98,16 @@ class Environment:
     def __enter__(self):
         self.prev_env = Environment._activae_env
         Environment._activae_env = self
+        return self
     
-    def __exit__(self):
+    def __exit__(self, exc_type, exc_value, traceback):
         Environment._activae_env = self.prev_env
 
-@contextmanager
-def create_env(coros: List[Coroutine], initial_time: Number = None):
-    pre_env = Environment._activae_env
-    env = Environment(coros, initial_time)
-    Environment._activae_env = env
-    yield env
-    Environment._activae_env = pre_env
 
-    
+def create_env(coros: List[Coroutine], initial_time: Number = 0):
+    return Environment(coros, initial_time)
+
+
 async def sleep(delay, env: 'Environment' = None):
     if env is None:
         env = get_active_env()

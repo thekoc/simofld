@@ -1,4 +1,6 @@
+import env
 from numbers import Number
+
 
 class Data:
     def __init__(self, size) -> None:
@@ -8,14 +10,19 @@ class Node:
     def __init__(self) -> None:
         pass
     
-    async def tansfer(self, node_to: 'Node', data_size: Number, channel: 'Channel'):
+    async def tansfer(self, to_node: 'Node', datasize: Number, channel: 'Channel', time_limit=None):
+        dr = channel.datarate_between(self, to_node)
+        time_cost = datasize / dr
+        await env.sleep(time_cost)
+
+    async def compute(self, data):
         pass
 
 class Channel:
     def __init__(self) -> None:
         pass
 
-    def data_rate_between(self, node_a: Node, node_b: Node) -> Number:
+    def datarate_between(self, node_a: Node, node_b: Node) -> Number:
         raise NotImplemented
 
 
