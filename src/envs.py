@@ -1,7 +1,7 @@
 from numbers import Number
 import types
 from typing import Optional, Union, NoReturn, List
-from . import exception
+from . import exceptions
 
 import heapq
 from typing import Coroutine
@@ -43,7 +43,7 @@ def get_active_env():
     if Environment._activae_env is not None:
         return Environment._activae_env
     else:
-        raise exception.NoCurrentEnvironmentError
+        raise exceptions.NoCurrentEnvironmentError
 
 def get_active_task():
     return get_active_env()._active_task

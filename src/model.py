@@ -1,4 +1,4 @@
-import env
+import envs
 from numbers import Number
 
 
@@ -13,7 +13,7 @@ class Node:
     async def tansfer(self, to_node: 'Node', datasize: Number, channel: 'Channel', time_limit=None):
         dr = channel.datarate_between(self, to_node)
         time_cost = datasize / dr
-        await env.sleep(time_cost)
+        await envs.sleep(time_cost)
 
     async def compute(self, data):
         pass
