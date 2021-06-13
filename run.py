@@ -1,7 +1,7 @@
 import asyncio
 from src import envs
 import random
-from src.envs import Environment, sleep, gather, get_active_env, create_env
+from src.envs import Environment, sleep, gather, get_current_env, create_env
 
 def test_sleep():
     async def aprint(s):
@@ -11,7 +11,7 @@ def test_sleep():
     async def func():
         print('starting...')
         await sleep(0.5)
-        print(f'ending, current time {get_active_env().now}...')
+        print(f'ending, current time {get_current_env().now}...')
 
     with create_env([func()]) as env:
         env.run()
