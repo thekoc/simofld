@@ -1,6 +1,6 @@
 from numbers import Number
 import types
-from typing import Union, NoReturn
+from typing import Union, NoReturn, List
 from . import exception
 
 import heapq
@@ -10,6 +10,10 @@ from contextlib import contextmanager
 
 OptionalCoroutine = Union[Coroutine, None]
 OptionalEnvironment = Union['Environment', None]
+OptionalTask = Union['Task', None]
+
+TaskList = List['Task']
+CoroutineList = List[Coroutine]
 
 class Task:
     def __init__(self, coro: Coroutine, wait_until=None, callbacks=None):
@@ -51,8 +55,9 @@ class Environment:
     def __init__(self, coros, initial_time=0) -> None:
         self.now = initial_time
         self._coros = coros
-        self._active_task = None
-        self._running_tasks = [Task(coro, wait_until=self.now) for coro in coros] # type: list[Task]
+        self._active_task: OptionalTask = None
+        self._running_tasks: TaskList = [Task(coro, wait_until=self.now) for coro in coros] # type: list[Task]
+        self.prev_env: OptionalEnvironment = None
 
     def start_task(self, task: Task, delay=None):
         if delay is None:
@@ -80,11 +85,15 @@ class Environment:
 
         print(f'all tasks done, current time: {self.now}')
 
-    def sleep(self, delay):
-        return sleep(self.now, delay)
+    def __enter__(self):
+        self.prev_env = Environment._activae_env
+        Environment._activae_env = self
+    
+    def __exit__(self):
+        Environment._activae_env = self.prev_env
 
 @contextmanager
-def create_env(coros: list[Coroutine], initial_time: Number = None):
+def create_env(coros: List[Coroutine], initial_time: Number = None):
     pre_env = Environment._activae_env
     env = Environment(coros, initial_time)
     Environment._activae_env = env
