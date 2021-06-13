@@ -19,16 +19,26 @@ CoroutineList = List[Coroutine]
 class Task:
     def __init__(self, coro: Coroutine, wait_until=None, callbacks=None):
         self.coro = coro # type: Coroutine
+        self._done = False
         self.wait_until = wait_until
         self.callbacks = callbacks if callbacks else []
     
     def step(self):
+        env = get_active_env()
         if self.coro is None:
             return
         else:
-            next_task = self.coro.send(None)
-            if next_task:
-                next_task.callbacks.append(self.step)
+            try:
+                next_task = self.coro.send(None)
+                if next_task:
+                    def callback():
+                        return env.start_task(self)
+                    next_task.callbacks.append(callback)
+            except StopIteration:
+                self._done = True
+    
+    def done(self):
+        return self._done
     
     def __await__(self):
         yield self
@@ -51,7 +61,6 @@ def get_active_task():
 class EmptyTask(Task):
     def __init__(self, wait_until=None, callbacks=None):
         super().__init__(None, wait_until=wait_until, callbacks=callbacks)
-
 
 class Environment:
     _activae_env: OptionalEnvironment = None
@@ -83,15 +92,13 @@ class Environment:
             task = heapq.heappop(self._running_tasks)
             self.now = task.wait_until
             self._active_task = task
-            try:
-                task.step()
+            task.step()
+            if task.done():
+                print('Task done')
                 if task.callbacks:
                     for callback in task.callbacks:
                         callback()
-            except StopIteration:
-                print('Task finished')
-            else:
-                self._active_task = None
+            self._active_task = None
 
         print(f'all tasks done, current time: {self.now}')
 
@@ -115,7 +122,7 @@ async def sleep(delay, env: 'Environment' = None):
     return await env.start_task(EmptyTask(), delay)
 
 
-async def gather(*coros, env: 'Environment' = None):
+async def gather(coros, env: 'Environment' = None):
     if env is None:
         env = get_active_env()
     coro_num = len(coros)
@@ -131,5 +138,4 @@ async def gather(*coros, env: 'Environment' = None):
         task = Task(coro, callbacks=[resume])
         env.start_task(task)
 
-    return gathering_task
-    
+    return await gathering_task
