@@ -19,10 +19,6 @@ class LocalData(Data):
 class Node(EnvironmentEntity):
     def __init__(self, data_process_rate: Optional[Number] = None) -> None:
         self.data_process_rate = data_process_rate
-    
-    async def tansfer_data(self, to_node: 'Node', channel: 'Channel', datasize: Number = None, time_limit: Number = None):
-        assert datasize is None != time_limit is None # can be constrained with only one of the arguments 
-        return await channel.tranfer_data(self, to_node, datasize=datasize, time_limit=time_limit)
 
     async def compute(self, datasize: Number):
         if self.data_process_rate is None or self.data_process_rate <= 0:
@@ -44,20 +40,14 @@ class Channel(EnvironmentEntity):
     async def transfer_data(self, from_node: Node, to_node: Node, datasize: Number = None, time_limit: Number = None):
         assert datasize is None != time_limit is None # can be constrained with only one of the arguments 
         self.ongoing_transmission_num += 1
+
+        dr = self.datarate_between(from_node, to_node)
         if datasize is not None:
-            dr = self.datarate_between(from_node, to_node)
             time_cost = datasize / dr
         else:
             time_cost = time_limit
+            datasize = time_cost * dr
+
 
         await envs.sleep(time_cost)
-
-
-
-class MobileUser(Node):
-    def __init__(self, data_process_rate: Optional[Number], channels: List[Channel]) -> None:
-        super().__init__(data_process_rate=data_process_rate)
-
-
-class CloudServer(Node):
-    pass
+        return LocalData(datasize, to_node)
