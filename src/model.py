@@ -2,8 +2,11 @@ import envs
 from numbers import Number
 from typing import List, Optional
 
+class EnvironmentEntity:
+    def current_env(self):
+        return envs.get_current_env()
 
-class Data:
+class Data(EnvironmentEntity):
     def __init__(self, size) -> None:
         self.size = size
 
@@ -13,7 +16,7 @@ class LocalData(Data):
         self.owner = owner
 
 
-class Node:
+class Node(EnvironmentEntity):
     def __init__(self, data_process_rate: Optional[Number] = None) -> None:
         self.data_process_rate = data_process_rate
     
@@ -31,7 +34,7 @@ class Node:
     async def main_loop(self):
         pass
 
-class Channel:
+class Channel(EnvironmentEntity):
     def __init__(self) -> None:
         self.ongoing_transmission_num = 0
 
