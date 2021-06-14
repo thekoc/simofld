@@ -1,4 +1,4 @@
-import heapq
+from queue import PriorityQueue
 from numbers import Number
 from typing import Callable, Optional, List, Coroutine
 
@@ -65,12 +65,12 @@ class Environment:
         self.now = initial_time
         self._coros = coros
         self._active_task: Optional[Task] = None
-        self._running_tasks: List[Task] = [Task(coro, wait_until=self.now) for coro in coros] # type: list[Task]
+        self._running_tasks = PriorityQueue() # Initialized using coros in self.run()
         self.prev_env: Optional[Environment] = None
         self.g = EnvironmentStorage()
 
     def start_task(self, task: Task):
-        heapq.heappush(self._running_tasks, task)
+        self._running_tasks.put(task)
         return task
     
     def create_task(self, coro: Coroutine, delay: Optional[Number] = 0, callbacks: Optional[List[Callable]] = [], start: bool = True):
@@ -80,8 +80,11 @@ class Environment:
         return task
 
     def run(self):
-        while self._running_tasks:
-            task = heapq.heappop(self._running_tasks)
+        for coro in self._coros:
+            self.create_task(coro)
+        
+        while not self._running_tasks.empty():
+            task = self._running_tasks.get_nowait()
             self.now = max(task.wait_until, self.now)
             self._active_task = task
             task.step()
@@ -112,6 +115,11 @@ async def sleep(delay, env: 'Environment' = None):
         env = get_current_env()
 
     return await env.create_task(None, delay)
+
+async def wait_for_simul_tasks():
+    """Wait for other tasks that are scheduled for the same time.
+    """
+    return await sleep(0)
 
 
 async def gather(coros, env: 'Environment' = None):
