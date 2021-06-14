@@ -1,20 +1,10 @@
+import heapq
 from numbers import Number
-import types
-from typing import Optional, Union, NoReturn, List
+from typing import Optional, List, Coroutine
+
 from . import exceptions
 
-import heapq
-from typing import Coroutine
-from contextlib import contextmanager
-from functools import wraps
 
-
-OptionalCoroutine = Union[Coroutine, None]
-OptionalEnvironment = Union['Environment', None]
-OptionalTask = Union['Task', None]
-
-TaskList = List['Task']
-CoroutineList = List[Coroutine]
 
 class Task:
     def __init__(self, coro: Coroutine, wait_until=None, callbacks=None):
@@ -63,14 +53,14 @@ class EmptyTask(Task):
         super().__init__(None, wait_until=wait_until, callbacks=callbacks)
 
 class Environment:
-    _current_env: OptionalEnvironment = None
+    _current_env: Optional['Environment'] = None
 
     def __init__(self, coros, initial_time=0) -> None:
         self.now = initial_time
         self._coros = coros
-        self._active_task: OptionalTask = None
-        self._running_tasks: TaskList = [Task(coro, wait_until=self.now) for coro in coros] # type: list[Task]
-        self.prev_env: OptionalEnvironment = None
+        self._active_task: Optional[Task] = None
+        self._running_tasks: List[Task] = [Task(coro, wait_until=self.now) for coro in coros] # type: list[Task]
+        self.prev_env: Optional[Environment] = None
 
     def start_task(self, task: Task, delay: Optional[Number] = None):
         if delay is None:
