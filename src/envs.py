@@ -4,7 +4,8 @@ from typing import Callable, Optional, List, Coroutine
 
 from . import exceptions
 
-
+class EnvironmentStorage:
+    pass
 
 class Task:
     def __init__(self, coro: Optional[Coroutine], wait_until: Optional[Number] = None, callbacks: Optional[List[Callable]] = []):
@@ -66,6 +67,7 @@ class Environment:
         self._active_task: Optional[Task] = None
         self._running_tasks: List[Task] = [Task(coro, wait_until=self.now) for coro in coros] # type: list[Task]
         self.prev_env: Optional[Environment] = None
+        self.g = EnvironmentStorage()
 
     def start_task(self, task: Task):
         heapq.heappush(self._running_tasks, task)
