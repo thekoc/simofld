@@ -46,7 +46,7 @@ class Task:
         return self.wait_until == other.wait_until
 
     def __lt__(self, other):
-        return self.wait_until < other.wait_until
+        return self.wait_until is None or self.wait_until < other.wait_until
 
 def get_current_env():
     if Environment._current_env is not None:
