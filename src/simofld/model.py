@@ -49,7 +49,7 @@ class Channel(EnvironmentEntity):
         Returns:
             [type]: [description]
         """
-        assert datasize is None != time_limit is None # can be constrained only by one of the arguments 
+        assert (datasize is None) ^ (time_limit is None) # can be constrained only by one of the arguments 
         self.ongoing_transmission_num += 1
 
         dr = self.datarate_between(from_node, to_node)
