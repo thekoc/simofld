@@ -1,8 +1,9 @@
 import unittest
 import random
-
-import src.envs as envs
-import src.exceptions as exceptions
+import sys
+sys.path.insert(0, 'src')
+from simofld import envs, exceptions
+from simofld.model import Channel, Node
 
 
 class TestEventLoop(unittest.TestCase):
@@ -32,6 +33,13 @@ class TestEventLoop(unittest.TestCase):
 
         with envs.create_env([func()]) as env:
             env.run()
+
+class TestModel(unittest.TestCase):
+    def test_channel(self):
+        channel = Channel()
+        channel.datarate_between = lambda a, b: 1
+        node_a, node_b = Node(), Node()
+        channel.transfer_data
 
 if __name__ == '__main__':
     unittest.main()

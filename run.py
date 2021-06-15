@@ -1,7 +1,10 @@
-import asyncio
-from src import envs
+import sys
 import random
-from src.envs import Environment, sleep, gather, get_current_env, create_env
+
+sys.path.insert(0, 'src')
+
+from simofld import envs
+from simofld.envs import Environment, sleep, gather, get_current_env, create_env
 
 def test_sleep():
     async def aprint(s):

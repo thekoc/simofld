@@ -1,4 +1,4 @@
-import envs
+from . import envs
 from numbers import Number
 from typing import List, Optional
 
@@ -38,7 +38,18 @@ class Channel(EnvironmentEntity):
         raise NotImplemented
     
     async def transfer_data(self, from_node: Node, to_node: Node, datasize: Number = None, time_limit: Number = None):
-        assert datasize is None != time_limit is None # can be constrained with only one of the arguments 
+        """[Coroutine] Transfer data bwteen nodes.
+
+        Args:
+            from_node (Node): From.
+            to_node (Node): To.
+            datasize (Number, optional): Datasize. If this argument has a value, `time_limit` should be set to `None`. Defaults to None.
+            time_limit (Number, optional): Time limit. If this argument has a value, `datasize` should be set to `None`. Defaults to None.
+
+        Returns:
+            [type]: [description]
+        """
+        assert datasize is None != time_limit is None # can be constrained only by one of the arguments 
         self.ongoing_transmission_num += 1
 
         dr = self.datarate_between(from_node, to_node)
