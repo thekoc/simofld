@@ -6,7 +6,7 @@ from numbers import Number
 
 import numpy as np
 
-import envs
+from . import envs
 from .model import Node, Channel
 
 class MobileUser(Node):
@@ -17,7 +17,7 @@ class MobileUser(Node):
     
     async def perform_cloud_computation(self, cloud_server: 'CloudServer', channel: Channel, upload_duration: Number):
         env = self.current_env()
-        data = await channel.transfer_data(self, cloud_server, time_limit=upload_duration)
+        data = await channel.transfer_data(self, cloud_server, duration=upload_duration)
         env.create_task(cloud_server.compute(data.size))
 
     async def perform_local_computation(self, compute_duration: Number):

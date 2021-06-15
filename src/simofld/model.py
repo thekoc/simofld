@@ -37,20 +37,20 @@ class Channel(EnvironmentEntity):
     def datarate_between(self, from_node: Node, to_node: Node) -> Number:
         raise NotImplemented
     
-    async def transfer_data(self, from_node: Node, to_node: Node, datasize: Number = None, time_limit: Number = None):
+    async def transfer_data(self, from_node: Node, to_node: Node, datasize: Number = None, duration: Number = None):
         """[Coroutine] Transfer data bwteen nodes.
 
         Args:
             from_node (Node): From.
             to_node (Node): To.
-            datasize (Number, optional): Datasize. If this argument has a value, `time_limit` should be set to `None`. Defaults to None.
-            time_limit (Number, optional): Time limit. If this argument has a value, `datasize` should be set to `None`. Defaults to None.
+            datasize (Number, optional): Datasize. If this argument has a value, `duration` should be set to `None`. Defaults to None.
+            duration (Number, optional): Time limit. If this argument has a value, `datasize` should be set to `None`. Defaults to None.
 
         Returns:
             [type]: [description]
         """
-        if not ((datasize is None) ^ (time_limit is None)): # Only one of the arguments is allowed to have value.
-            raise ValueError('Only one of `datasie`, `time_limit` is allowed to have value.')
+        if not ((datasize is None) ^ (duration is None)): # Only one of the arguments is allowed to have value.
+            raise ValueError('Only one of `datasie`, `duration` is allowed to have value.')
 
         self.ongoing_transmission_num += 1
 
@@ -58,7 +58,7 @@ class Channel(EnvironmentEntity):
         if datasize is not None:
             time_cost = datasize / dr
         else:
-            time_cost = time_limit
+            time_cost = duration
             datasize = time_cost * dr
 
 

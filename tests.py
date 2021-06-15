@@ -45,13 +45,13 @@ class TestModel(unittest.TestCase):
 
             # test argument checking
             with self.assertRaises(ValueError):
-                await channel.transfer_data(node_a, node_b, datasize=1, time_limit=1)
-                await channel.transfer_data(node_a, node_b, datasize=None, time_limit=None)
+                await channel.transfer_data(node_a, node_b, datasize=1, duration=1)
+                await channel.transfer_data(node_a, node_b, datasize=None, duration=None)
             
-            # test time_limit
+            # test duration
             duration = random.random() + 0.1
             now = envs.get_current_env().now
-            await channel.transfer_data(node_a, node_b, time_limit=duration)
+            await channel.transfer_data(node_a, node_b, duration=duration)
             self.assertEqual(duration, envs.get_current_env().now - now)
 
             # test data_size
@@ -60,8 +60,6 @@ class TestModel(unittest.TestCase):
             duration = datasize / dr
             await channel.transfer_data(node_a, node_b, datasize=datasize)
             self.assertEqual(duration, envs.get_current_env().now - now)
-
-
 
         with envs.create_env([coro()]) as env:
             env.run()
