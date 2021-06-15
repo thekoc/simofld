@@ -38,11 +38,29 @@ class TestModel(unittest.TestCase):
     def test_channel(self):
         async def coro():
             channel = Channel()
-            channel.datarate_between = lambda *_: 1
+
+            dr = random.random()
+            channel.datarate_between = lambda *_: dr
             node_a, node_b = Node(), Node()
-            duration = random.random()
+
+            # test argument checking
+            with self.assertRaises(ValueError):
+                await channel.transfer_data(node_a, node_b, datasize=1, time_limit=1)
+                await channel.transfer_data(node_a, node_b, datasize=None, time_limit=None)
+            
+            # test time_limit
+            duration = random.random() + 0.1
+            now = envs.get_current_env().now
             await channel.transfer_data(node_a, node_b, time_limit=duration)
-            self.assertEqual(duration, envs.get_current_env().now)
+            self.assertEqual(duration, envs.get_current_env().now - now)
+
+            # test data_size
+            datasize = random.random() + 0.1
+            now = envs.get_current_env().now
+            duration = datasize / dr
+            await channel.transfer_data(node_a, node_b, datasize=datasize)
+            self.assertEqual(duration, envs.get_current_env().now - now)
+
 
 
         with envs.create_env([coro()]) as env:
