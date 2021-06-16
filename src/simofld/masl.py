@@ -19,11 +19,10 @@ class MobileUser(Node):
     async def perform_cloud_computation(self, cloud_server: 'CloudServer', channel: Channel, upload_duration: Number):
         env = self.current_env()
         data = await channel.transfer_data(self, cloud_server, duration=upload_duration)
-        env.create_task(cloud_server.compute(data.size))
+        env.create_task(cloud_server.compute(datasize=data.size))
 
-    async def perform_local_computation(self, compute_duration: Number):
-        env = self.current_env()
-        await envs.sleep(compute_duration)
+    async def perform_local_computation(self, duration: Number):
+        await self.compute(duration=duration)
 
     async def main_loop(self):
         channel_num = len(self.channels)
@@ -53,9 +52,6 @@ class MobileUser(Node):
                 w = w + lr * r * (e - w)
             else:
                 await envs.sleep(step_lapse)
-
-
-
 
 
 class CloudServer(Node):
