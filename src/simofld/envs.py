@@ -19,6 +19,8 @@ class Task:
         self.coro = coro # type: Coroutine
         self.lifespan = None
         self._done = False
+        self._started = False
+        self._suspended = False
         self.wait_until = wait_until
         self.callbacks = [] if callbacks == [] else callbacks
     
@@ -37,17 +39,27 @@ class Task:
                     next_task.callbacks.append(callback)
             except StopIteration:
                 self._done = True
+    
+    def suspend(self):
+        self._suspended = True
 
-    def done(self):
+    def resume(self):
+        get_current_env().start_task(self)
+        self._suspended = False
+    
+    @property
+    def done(self) -> bool:
         return self._done
     
     def __await__(self):
         env = get_current_env()
+        if not self._started and not self._suspended:
+            env.start_task(self)
+
         start = env.now
         yield self
         self.lifespan = (start, env.now)
         return self
-
 
     def __eq__(self, other):
         return self.wait_until == other.wait_until
@@ -67,8 +79,8 @@ def get_active_task():
 class Environment:
     _current_env: Optional['Environment'] = None
 
-    def __init__(self, coros, initial_time=0) -> None:
-        self.now = initial_time
+    def __init__(self, coros: List[Coroutine], initial_time: Number = 0) -> None:
+        self.now: Number = initial_time
         self._coros = coros
         self._active_task: Optional[Task] = None
         self._running_tasks = PriorityQueue() # Initialized using coros in self.run()
@@ -77,6 +89,7 @@ class Environment:
 
     def start_task(self, task: Task):
         self._running_tasks.put(task)
+        task._started = True
         return task
     
     def create_task(self, coro: Coroutine, delay: Optional[Number] = 0, callbacks: Optional[List[Callable]] = [], start: bool = True):
@@ -90,11 +103,16 @@ class Environment:
             self.create_task(coro)
         
         while not self._running_tasks.empty():
-            task = self._running_tasks.get_nowait()
-            self.now = max(task.wait_until, self.now)
+            task: Task = self._running_tasks.get_nowait()
+
+            if task._suspended:
+                continue
+                
+            if task.wait_until is not None:
+                self.now = max(task.wait_until, self.now)
             self._active_task = task
             task.step()
-            if task.done():
+            if task.done:
                 print('Task done')
                 if task.callbacks:
                     for callback in task.callbacks:
@@ -141,9 +159,10 @@ async def gather(coros, env: 'Environment' = None):
         nonlocal done_num
         done_num += 1
         if done_num == coro_num:
-            env.start_task(gathering_task)
+            gathering_task.resume()
     
     for coro in coros:
         env.create_task(coro, callbacks=[resume])
+    gathering_task.suspend()
 
     return await gathering_task
