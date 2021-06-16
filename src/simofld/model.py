@@ -24,7 +24,7 @@ class EnvironmentEntityMeta(type):
         return [x for x in cls._instances]
 
 class EnvironmentEntity(metaclass=EnvironmentEntityMeta):
-    def current_env(self):
+    def get_current_env(self):
         return envs.get_current_env()
 
 class Data(EnvironmentEntity):

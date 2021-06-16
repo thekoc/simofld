@@ -17,7 +17,7 @@ class MobileUser(Node):
         super().__init__(data_process_rate=data_process_rate)
     
     async def perform_cloud_computation(self, cloud_server: 'CloudServer', channel: Channel, upload_duration: Number):
-        env = self.current_env()
+        env = self.get_current_env()
         data = await channel.transfer_data(self, cloud_server, duration=upload_duration)
         env.create_task(cloud_server.compute(datasize=data.size))
 
@@ -30,7 +30,7 @@ class MobileUser(Node):
         lr = 0.1 # learning rate
         choice_list = [None] + self.channels
         
-        cloud_server = self.current_env().g.cloud_server
+        cloud_server = self.get_current_env().g.cloud_server
 
         w = np.full(channel_num + 1, 1 / (channel_num + 1))
 
@@ -58,7 +58,7 @@ class MobileUser(Node):
 class CloudServer(Node):
     def __init__(self, data_process_rate: Number = 1) -> None:
         super().__init__(data_process_rate=data_process_rate)
-        env =  self.current_env()
+        env =  self.get_current_env()
         if env.g.cloud_server is not None:
             raise ValueError('Only one cloud server can be set for the env')
         env.g.cloud_server = self
