@@ -69,9 +69,16 @@ class Node(EnvironmentEntity):
     async def main_loop(self):
         raise NotImplemented
 
+class Transmission(envs.Task):
+    def __init__(self, from_node: Node, to_node: Node, duration: Number) -> None:
+        super().__init__(coro=envs.sleep(duration), wait_until=None, callbacks=[])
+        self.from_node = from_node
+        self.to_node = to_node
+
+
 class Channel(EnvironmentEntity):
     def __init__(self) -> None:
-        self.ongoing_transmission_num = 0
+        self.transmission_list = []
 
     def datarate_between(self, from_node: Node, to_node: Node) -> Number:
         raise NotImplemented
@@ -86,12 +93,10 @@ class Channel(EnvironmentEntity):
             duration (Number, optional): Time limit. If this argument has a value, `datasize` should be set to `None`. Defaults to None.
 
         Returns:
-            [type]: [description]
+            [type]: [description] TODO: Decide what to return
         """
         if not utils.singular_not_none(datasize, duration): # Only one of the arguments is allowed to have value.
             raise ValueError('Only one of `datasie`, `duration` is allowed to have a value.')
-
-        self.ongoing_transmission_num += 1
 
         dr = self.datarate_between(from_node, to_node)
         assert isinstance(dr, Number)
@@ -102,10 +107,12 @@ class Channel(EnvironmentEntity):
             duration = duration
             datasize = duration * dr
 
+        transmission = Transmission(from_node, to_node, duration=duration)
+        self.transmission_list.append(transmission)
 
-        await envs.sleep(duration)
+        await transmission
         from_node.total_upload_time += duration
         to_node.total_download_time += duration
 
-        self.ongoing_transmission_num -= 1
+        self.transmission_list.pop()
         return LocalData(datasize, to_node)
