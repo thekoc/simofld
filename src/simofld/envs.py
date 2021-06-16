@@ -106,8 +106,8 @@ class Environment:
         Environment._current_env = self.prev_env
 
 
-def create_env(coros: List[Coroutine], initial_time: Number = 0):
-    return Environment(coros, initial_time)
+def create_env(coros: Optional[List[Coroutine]]=None, initial_time: Number = 0):
+    return Environment(coros if coros else [], initial_time)
 
 
 async def sleep(delay, env: 'Environment' = None):
