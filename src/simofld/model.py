@@ -1,10 +1,27 @@
-import queue
-from . import envs
-from . import utils
 from numbers import Number
 from typing import List, Optional
+from weakref import WeakSet
 
-class EnvironmentEntity:
+
+from . import envs
+from . import utils
+
+
+class EnvironmentEntityMeta(type):
+    def __new__ (cls, name, bases, namespace):
+        namespace['_instances'] = WeakSet()
+        return super().__new__(cls, name, bases, namespace)
+
+    def __call__(cls, *args, **kwargs):
+        instance = super().__call__(*args, **kwargs)
+        cls._instances.add(instance)
+        return instance
+    
+    @property
+    def instances(cls):
+        return [x for x in cls._instances]
+
+class EnvironmentEntity(metaclass=EnvironmentEntityMeta):
     def current_env(self):
         return envs.get_current_env()
 
