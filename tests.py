@@ -46,11 +46,14 @@ class TestModel(unittest.TestCase):
 
             # test argument checking
             with self.assertRaises(ValueError):
-                await channel.transfer_data(node_a, node_b, datasize=1, duration=1)
-                await channel.transfer_data(node_a, node_b, datasize=None, duration=None)
+                await channel.transfer_data(node_a, node_b, duration=1, datasize=1)
+                await channel.transfer_data(node_a, node_b, duration=None, datasize=None)
+            
+            total_duration = 0
             
             # test duration
             duration = random.random() + 0.1
+            total_duration += duration
             now = envs.get_current_env().now
             await channel.transfer_data(node_a, node_b, duration=duration)
             self.assertEqual(duration, envs.get_current_env().now - now)
@@ -59,8 +62,19 @@ class TestModel(unittest.TestCase):
             datasize = random.random() + 0.1
             now = envs.get_current_env().now
             duration = datasize / dr
+            total_duration += duration
             await channel.transfer_data(node_a, node_b, datasize=datasize)
             self.assertEqual(duration, envs.get_current_env().now - now)
+
+            # test total duration
+            duration = random.random()
+            channel.transfer_data(node_b, node_a, duration=duration)
+            self.assertEqual(node_a.total_upload_time, total_duration)
+            self.assertEqual(node_a.total_download_time, duration)
+            
+            self.assertEqual(node_b.total_download_time, total_duration)
+            self.assertEqual(node_b.total_upload_time, duration)
+
 
         with envs.create_env([coro()]) as env:
             env.run()
