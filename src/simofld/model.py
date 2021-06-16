@@ -30,19 +30,31 @@ class Data(EnvironmentEntity):
         self.size = size
 
 class LocalData(Data):
+    # TODO: Should it be remained?
     def __init__(self, size, owner: 'Node') -> None:
         super().__init__(size)
         self.owner = owner
 
 
 class Node(EnvironmentEntity):
-    def __init__(self, data_process_rate: Optional[Number] = None) -> None:
+    def __init__(self, data_process_rate: Optional[Number] = None, env: envs.Environment = None) -> None:
         self.data_process_rate = data_process_rate
+        self.env = env if env else envs.get_current_env()
         self.total_upload_time = 0
         self.total_download_time = 0
         self.total_compute_time = 0
 
-    async def compute(self, duration: Optional[Number] = None, datasize: Optional[Number] = None):
+    async def compute(self, duration: Optional[Number] = None, datasize: Optional[Number] = None) -> None:
+        """[Coroutine] Do local computation. `self.total_compute_time` will be updated acc
+
+        Args:
+            duration (Optional[Number], optional): [description]. Defaults to None.
+            datasize (Optional[Number], optional): Datasize. Defaults to None.
+
+        Raises:
+            ValueError: Raises when not exactly one of `duration` and `datasize` is not None.
+            ValueError: Raises when `self.data_process_rate` is invalid when needed.
+        """
         if not utils.singular_not_none(datasize, duration):
             raise ValueError('Only one of `datasie`, `duration` is allowed to have a value.')
 
@@ -56,7 +68,7 @@ class Node(EnvironmentEntity):
         self.total_compute_time += duration
 
     async def main_loop(self):
-        pass
+        raise NotImplemented
 
 class Channel(EnvironmentEntity):
     def __init__(self) -> None:
