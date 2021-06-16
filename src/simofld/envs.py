@@ -24,7 +24,7 @@ class Task:
     def step(self):
         env = get_current_env()
         if self.coro is None:
-            return
+            self._done = True
         else:
             try:
                 next_task: Task = self.coro.send(None)
