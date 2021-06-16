@@ -5,6 +5,7 @@ from typing import List, Optional
 from numbers import Number
 
 import numpy as np
+from numpy import random
 
 from . import envs
 from .model import Node, Channel
@@ -26,12 +27,35 @@ class MobileUser(Node):
 
     async def main_loop(self):
         channel_num = len(self.channels)
-        time_delta = 0.1
+        step_lapse = 1
+        lr = 0.1 # learning rate
+        choice_list = [None] + self.channels
+
+
         w = np.full(channel_num + 1, 1 / (channel_num + 1))
 
         while True:
-            if not self.active:
-                await envs.sleep()
+            if self.active:
+                choice_index = random.choice(channel_num + 1, 1, p=w).item()
+                if choice_index == 0: # local execution
+                    payoff = I()
+                    await self.perform_local_computation(step_lapse)
+                    
+                else: # cloud execution
+                    channel = choice_list[choice_index]
+                    await self.perform_cloud_computation(cloud_server, channel, step_lapse)
+                    payoff = Q()
+
+                e = np.zeros(channel_num + 1)
+                e[choice_index] = 1
+
+                r = 1 - gamma * payoff
+                w = w + lr * r * (e - w)
+            else:
+                await envs.sleep(step_lapse)
+
+
+
 
 
 class CloudServer(Node):
