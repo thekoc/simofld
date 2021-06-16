@@ -37,9 +37,8 @@ class LocalData(Data):
 
 
 class Node(EnvironmentEntity):
-    def __init__(self, data_process_rate: Optional[Number] = None, env: envs.Environment = None) -> None:
+    def __init__(self, data_process_rate: Optional[Number] = None) -> None:
         self.data_process_rate = data_process_rate
-        self.env = env if env else envs.get_current_env()
         self.total_upload_time = 0
         self.total_download_time = 0
         self.total_compute_time = 0

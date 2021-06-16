@@ -13,7 +13,19 @@ class TestEventLoop(unittest.TestCase):
         self.assertRaises(exceptions.NoCurrentEnvironmentError, envs.get_current_env)
 
     def test_envs(self):
-        pass
+        # test lifespan
+
+        async def coro():
+
+            self.assertEqual(envs.get_current_env().now, 0)
+            delay = random.random()
+            task = envs.get_current_env().create_task(envs.sleep(delay))
+            x = await task
+
+            self.assertEqual(envs.get_current_env().now, delay)
+
+        with envs.create_env([coro()]) as env:
+            env.run()
 
     def test_sleep(self):
         async def coro():

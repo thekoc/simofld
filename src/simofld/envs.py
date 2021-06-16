@@ -13,10 +13,11 @@ class Task:
 
         Args:
             coro (Optional[Coroutine]): Coroutine inside the task.
-            wait_until (Optional[Number], optional): When should the task be scheduled. Defaults to None.
+            wait_until (Optional[Number], optional): When should the task be scheduled. If None, the task will be executed once started. Defaults to None.
             callbacks (Optional[List[Callable]], optional): Set it to None if return to the parent coroutine is not wanted. Defaults to [].
         """
         self.coro = coro # type: Coroutine
+        self.lifespan = None
         self._done = False
         self.wait_until = wait_until
         self.callbacks = [] if callbacks == [] else callbacks
@@ -36,12 +37,17 @@ class Task:
                     next_task.callbacks.append(callback)
             except StopIteration:
                 self._done = True
-    
+
     def done(self):
         return self._done
     
     def __await__(self):
+        env = get_current_env()
+        start = env.now
         yield self
+        self.lifespan = (start, env.now)
+        return self
+
 
     def __eq__(self, other):
         return self.wait_until == other.wait_until
