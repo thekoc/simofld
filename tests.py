@@ -16,13 +16,10 @@ class TestEventLoop(unittest.TestCase):
         # test lifespan
 
         async def coro():
-
             self.assertEqual(envs.get_current_env().now, 0)
             delay = random.random()
-            task = envs.get_current_env().create_task(envs.sleep(delay))
-            x = await task
-
-            self.assertEqual(envs.get_current_env().now, delay)
+            task = await envs.get_current_env().create_task(envs.sleep(delay))
+            self.assertEqual(task.lifespan, (0, delay))
 
         with envs.create_env([coro()]) as env:
             env.run()
@@ -40,7 +37,7 @@ class TestEventLoop(unittest.TestCase):
     def test_gather(self):
         async def coro():
             self.assertEqual(envs.get_current_env().now, 0)
-            delays = [random.random() for _ in range(10)]
+            delays = [random.random() for _ in range(1)]
             await envs.gather([envs.sleep(delay) for delay in delays])
             self.assertEqual(max(delays), envs.get_current_env().now)
 
@@ -68,7 +65,7 @@ class TestModel(unittest.TestCase):
             total_duration += duration
             now = envs.get_current_env().now
             await channel.transfer_data(node_a, node_b, duration=duration)
-            self.assertEqual(duration, envs.get_current_env().now - now)
+            self.assertAlmostEqual(duration, envs.get_current_env().now - now)
 
             # test data_size
             datasize = random.random() + 0.1
@@ -76,20 +73,34 @@ class TestModel(unittest.TestCase):
             duration = datasize / dr
             total_duration += duration
             await channel.transfer_data(node_a, node_b, datasize=datasize)
-            self.assertEqual(duration, envs.get_current_env().now - now)
+            self.assertAlmostEqual(duration, envs.get_current_env().now - now)
 
             # test total duration
             duration = random.random()
-            channel.transfer_data(node_b, node_a, duration=duration)
-            self.assertEqual(node_a.total_upload_time, total_duration)
-            self.assertEqual(node_a.total_download_time, duration)
-            
-            self.assertEqual(node_b.total_download_time, total_duration)
-            self.assertEqual(node_b.total_upload_time, duration)
+            await channel.transfer_data(node_b, node_a, duration=duration)
+            self.assertAlmostEqual(node_a.total_upload_time, total_duration)
+            self.assertAlmostEqual(node_a.total_download_time, duration)
 
+            self.assertAlmostEqual(node_b.total_download_time, total_duration)
+            self.assertAlmostEqual(node_b.total_upload_time, duration)
 
+            # test ongoing_transmission_num
         with envs.create_env([coro()]) as env:
             env.run()
+
+    def test_entity_count(self):
+        with envs.create_env():
+            self.assertEqual(len(Node.instances), 0)
+            def f():
+                self.assertEqual(len(Node.instances), 0)
+                node_a = Node()
+                self.assertEqual(len(Node.instances), 1)
+                node_b = Node()
+                self.assertEqual(len(Node.instances), 2)
+                Node()
+                self.assertEqual(len(Node.instances), 2)
+            f()
+            self.assertEqual(len(Node.instances), 0)
 
 class TestUtils(unittest.TestCase):
     def test_utils(self):
