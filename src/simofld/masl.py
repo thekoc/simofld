@@ -10,12 +10,45 @@ from numpy import random
 from . import envs
 from .model import Node, Channel
 
+SIMULATION_PARAMETERS = {
+    # CHART
+    'AP_COVERAGE': 50, # meter
+    'MOBILE_NUM': 20,
+    'MOBILE_ACTIVE_PROBABILITY': 0.9,
+    'CHANNEL_NUM': 10,
+    'CHANNEL_BANDWITH': 5, # MHz
+    'TRANSMIT_POWER': 100, # mW
+    'PATH_LOSS_EXPONENT': 4,
+    'BACKGROUND_NOISE': -100, # dBm
+    'DATA_SIZE': 5000, # KB
+    'LOCAL_CPU_CYCLES': 1000, # Megacycles
+    'CLOUD_CPU_CYCLES': 1200, # Megacycles
+    'COMPUTATIONAL_ENERGY_WEIGHT': (0, 0.5, 1.0),
+    'COMPUTATIONAL_TIME_WEIGHT': None,
+    'COMPUTING_ENERGY_EFFECIENCY': (400, 500, 600), # Megacycles/J
+    
+    # MOBILE
+    'LEARNING_RATE': 0.1,
+    
+    # Channel
+    'CHANNEL_SCALING_FACTOR': 10**5,
+}
+
+def I():
+    return 1
+
+def Q():
+    return 1
+
 class MobileUser(Node):
     def __init__(self, data_process_rate: Optional[Number], channels: List[Channel]) -> None:
+        self._x = random.random() * 50
+        self.lr = SIMULATION_PARAMETERS['LEARNING_RATE']
+        self.active_probability = 1 - random.random()
         self.channels = channels
-        self.active = True
+        self.active = None
         super().__init__(data_process_rate=data_process_rate)
-    
+
     async def perform_cloud_computation(self, cloud_server: 'CloudServer', channel: Channel, upload_duration: Number):
         env = self.get_current_env()
         data = await channel.transfer_data(self, cloud_server, duration=upload_duration)
@@ -27,14 +60,17 @@ class MobileUser(Node):
     async def main_loop(self):
         channel_num = len(self.channels)
         step_lapse = 1
-        lr = 0.1 # learning rate
+        lr = self.lr
         choice_list = [None] + self.channels
         
         cloud_server = self.get_current_env().g.cloud_server
 
         w = np.full(channel_num + 1, 1 / (channel_num + 1))
+        theta = self.active_probability
+        gamma = 10**5
 
         while True:
+            self.active = True if random.random() < theta else False
             if self.active:
                 choice_index = random.choice(channel_num + 1, 1, p=w).item()
                 if choice_index == 0: # local execution
