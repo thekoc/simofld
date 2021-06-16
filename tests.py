@@ -4,6 +4,7 @@ import sys
 sys.path.insert(0, 'src')
 from simofld import envs, exceptions
 from simofld.model import Channel, Node
+import simofld.utils as utils
 
 random.seed(0)
 
@@ -63,6 +64,16 @@ class TestModel(unittest.TestCase):
 
         with envs.create_env([coro()]) as env:
             env.run()
+
+class TestUtils(unittest.TestCase):
+    def test_utils(self):
+        self.assertTrue(utils.singular_not_none(1))
+        self.assertTrue(utils.singular_not_none(1, None))
+        self.assertTrue(utils.singular_not_none(1, None, None))
+
+        self.assertFalse(utils.singular_not_none(1, 1, None))
+        self.assertFalse(utils.singular_not_none(None, None, None))
+        self.assertFalse(None)
 
 if __name__ == '__main__':
     unittest.main()
