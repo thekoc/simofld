@@ -1,3 +1,4 @@
+import logging
 from numbers import Number
 from typing import List, Optional
 from weakref import WeakSet
@@ -6,6 +7,7 @@ from weakref import WeakSet
 from . import envs
 from . import utils
 
+logger = logging.getLogger(__name__)
 
 class EnvironmentEntityMeta(type):
     def __new__ (cls, name, bases, namespace):

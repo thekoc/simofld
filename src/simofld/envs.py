@@ -1,8 +1,12 @@
+import logging
 from queue import PriorityQueue
 from numbers import Number
 from typing import Callable, Optional, List, Coroutine
 
 from . import exceptions
+
+logger = logging.getLogger(__name__)
+logger.setLevel(logging.DEBUG)
 
 class EnvironmentStorage:
     pass
@@ -113,13 +117,13 @@ class Environment:
             self._active_task = task
             task.step()
             if task.done:
-                print('Task done')
+                logger.debug('Task done')
                 if task.callbacks:
                     for callback in task.callbacks:
                         callback()
             self._active_task = None
 
-        print(f'all tasks done, current time: {self.now}')
+        logger.debug(f'all tasks done, current time: {self.now}')
 
     def __enter__(self):
         self.prev_env = Environment._current_env
