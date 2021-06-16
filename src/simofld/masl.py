@@ -29,7 +29,8 @@ class MobileUser(Node):
         step_lapse = 1
         lr = 0.1 # learning rate
         choice_list = [None] + self.channels
-
+        
+        cloud_server = self.current_env().g.cloud_server
 
         w = np.full(channel_num + 1, 1 / (channel_num + 1))
 
@@ -55,4 +56,9 @@ class MobileUser(Node):
 
 
 class CloudServer(Node):
-    pass
+    def __init__(self, data_process_rate: Number = 1) -> None:
+        super().__init__(data_process_rate=data_process_rate)
+        env =  self.current_env()
+        if env.g.cloud_server is not None:
+            raise ValueError('Only one cloud server can be set for the env')
+        env.g.cloud_server = self
