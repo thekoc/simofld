@@ -8,7 +8,7 @@ import numpy as np
 from numpy import log2, random
 
 from . import envs
-from .model import Node, Channel
+from .model import LocalData, Node, Channel
 
 SIMULATION_PARAMETERS = {
     # CHART
@@ -21,11 +21,13 @@ SIMULATION_PARAMETERS = {
     'PATH_LOSS_EXPONENT': 4,
     'BACKGROUND_NOISE': -100, # dBm
     'DATA_SIZE': 5000, # KB
-    'LOCAL_CPU_CYCLES': 1000, # Megacycles
-    'CLOUD_CPU_CYCLES': 1200, # Megacycles
+    'LOCAL_CPU_CYCLES': 1000 * 10**6, # Megacycles
+    'CLOUD_CPU_CYCLES': 1200 * 10**6, # Megacycles
+    'LOCAL_CPU_CAPABILITY': (0.5 * 10**9, 0.8 * 10**9, 1.0 * 10**9), # GHz,
+    'CLOUD_CPU_CAPABILITY': 12 * 10**9, # GHz,
     'COMPUTATIONAL_ENERGY_WEIGHT': (0, 0.5, 1.0),
     'COMPUTATIONAL_TIME_WEIGHT': None,
-    'COMPUTING_ENERGY_EFFECIENCY': (400, 500, 600), # Megacycles/J
+    'COMPUTING_ENERGY_EFFECIENCY': (400 * 10**6, 500 * 10**6, 600 * 10**6), # Megacycles/J
     
     # MOBILE
     'LEARNING_RATE': 0.1,
@@ -37,25 +39,21 @@ SIMULATION_PARAMETERS = {
 class MobileUser(Node):
     def __init__(self, channels: List[Channel]) -> None:
         super().__init__()
-
-        self.data_process_rate = 
-        self._x = random.random() * 50
+        self._x = (1 - random.random()) * 50 # Distance to the AP
         self.lr = SIMULATION_PARAMETERS['LEARNING_RATE']
         self.active_probability = 1 - random.random()
         self.channels = channels
-        self.transmit_power = SIMULATION_PARAMETERS['SIMULATION_PARAMETERS'] # p_i
+        self.transmit_power = SIMULATION_PARAMETERS['TRANSMIT_POWER'] # p_i
         self.active = None
 
+        self.cpu_frequency = SIMULATION_PARAMETERS['LOCAL_CPU_CAPABILITY'] # Megacycles/s
+        self.cpu_effeciency = SIMULATION_PARAMETERS['COMPUTING_ENERGY_EFFECIENCY'][0] # Megacycles/J TODO: Random selection
         # TODO: Make them stochastic
         self._payoff_weight_energy = 0.5
         self._payoff_weight_time = 0.5
 
         self._datasize = SIMULATION_PARAMETERS['DATA_SIZE']
 
-
-
-
-    
     def _psi(self, bandwidth: Number) -> Number:
         """Used to calculate `self._I`.
 
@@ -70,20 +68,21 @@ class MobileUser(Node):
         p = self.transmit_power
         C = self._datasize
         B = bandwidth
-        
 
-        T_loc = C / self.data_process_rate
-        E_loc = T_loc 
+        D_loc = SIMULATION_PARAMETERS['LOCAL_CPU_CYCLES']
+        T_loc = D_loc / (self.cpu_frequency)
+        E_loc = D_loc / self.cpu_effeciency 
 
-        T_clo_2 = C / self.data_process_rate
+        D_clo = SIMULATION_PARAMETERS['CLOUD_CPU_CYCLES']
+        T_clo_2 = D_clo / (SIMULATION_PARAMETERS['CLOUD_CPU_CAPABILITY'])
 
         n = (mu_E * p + mu_T) * C
         d = B * (mu_T * T_loc + mu_E * E_loc - mu_T * T_clo_2)
         return n / d
 
-    def _Q(self, channel: 'RayleighChannel') -> Number:
-        channel_power = channel.channel_power(self)
-        bandwidth = channel.bandwidth
+    def _Q(self) -> Number:
+        channel_power = RayleighChannel.channel_power(self)
+        bandwidth = RayleighChannel.bandwidth
         psi = self._psi(bandwidth)
         sigma_0 = SIMULATION_PARAMETERS['BACKGROUND_NOISE']
         return (channel_power / (2**psi - 1)) - sigma_0
@@ -94,7 +93,16 @@ class MobileUser(Node):
     async def perform_cloud_computation(self, cloud_server: 'CloudServer', channel: Channel, upload_duration: Number):
         env = self.get_current_env()
         data = await channel.transfer_data(self, cloud_server, duration=upload_duration)
-        env.create_task(cloud_server.compute(datasize=data.size))
+        transmission_datasize = data.size
+
+        # TODO: Make this more readable
+        total_size = SIMULATION_PARAMETERS['DATA_SIZE']
+        total_cycles = SIMULATION_PARAMETERS['CLOUD_CPU_CYCLES']
+        cloud_frequency = cloud_server.cpu_frequency
+        
+        task_cycle_cloud =  transmission_datasize / total_size * total_cycles
+        duration = task_cycle_cloud / cloud_frequency
+        env.create_task(cloud_server.compute(duration))
 
     async def perform_local_computation(self, duration: Number):
         await self.compute(duration=duration)
@@ -119,14 +127,15 @@ class MobileUser(Node):
 
             if self.active:
                 choice_index = random.choice(channel_num + 1, 1, p=w).item()
+
                 if choice_index == 0: # local execution
-                    payoff = I()
+                    payoff = self._Q()
                     await self.perform_local_computation(step_lapse)
                     
                 else: # cloud execution
                     channel = choice_list[choice_index]
                     await self.perform_cloud_computation(cloud_server, channel, step_lapse)
-                    payoff = Q()
+                    payoff = self._I(channel)
 
                 e = np.zeros(channel_num + 1)
                 e[choice_index] = 1
@@ -140,13 +149,16 @@ class MobileUser(Node):
 class RayleighChannel(Channel):
     """A channel that follows Rayleigh fading. Notice that the datarate will also be affected by connected user. 
     """
+    bandwidth: Number = SIMULATION_PARAMETERS['CHANNEL_BANDWITH']
+
+    # TODO: Update it periodically
+    beta: Number = random.exponential(1) # Rayleigh fading factor
+
     def __init__(self) -> None:
         super().__init__()
-        # TODO: Update it periodically
-        self.beta: Number = random.exponential(1) # Rayleigh fading factor
-        self.bandwidth: Number = SIMULATION_PARAMETERS['CHANNEL_BANDWITH']
 
-    def channel_power(self, mobile: MobileUser) -> Number:
+    @classmethod
+    def channel_power(cls, mobile: MobileUser) -> Number:
         """It is the :math:`p_i g_{i,o}` in the original paper.
 
         Args:
@@ -154,7 +166,7 @@ class RayleighChannel(Channel):
         Returns:
             Number: :math:`p_i g_{i,o}`
         """
-        beta = self.beta
+        beta = cls.beta
         alpha = SIMULATION_PARAMETERS['PATH_LOSS_EXPONENT']
         distance = abs(mobile._x)
         return mobile.transmit_power * distance**(-alpha) * beta
@@ -172,25 +184,21 @@ class RayleighChannel(Channel):
             node = transmission.from_node
             assert isinstance(node, MobileUser)
             if node.active:
-                tot_power += self.channel_power(node, beta)
+                tot_power += self.channel_power(node)
         return tot_power
 
 
     def datarate_between(self, mobile: MobileUser, to_node: 'CloudServer') -> Number:
-        beta = self.beta
-        channel_power = self.channel_power(mobile, beta)
+        channel_power = self.channel_power(mobile)
 
-        total_channel_power = self.total_channel_power(beta)
+        total_channel_power = self.total_channel_power()
         
         B = self.bandwidth
         sigma_0 = SIMULATION_PARAMETERS['BACKGROUND_NOISE']
 
         return B * log2(1 + channel_power / (total_channel_power - channel_power + sigma_0))
-        
-    
-
 
 class CloudServer(Node):
-    def __init__(self, data_process_rate: Number = 1) -> None:
-        super().__init__(data_process_rate=data_process_rate)
-
+    def __init__(self) -> None:
+        super().__init__()
+        self.cpu_frequency: Number = SIMULATION_PARAMETERS['CLOUD_CPU_CAPABILITY'] # Megacycles/s

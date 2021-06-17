@@ -28,8 +28,8 @@ class EnvironmentEntity(metaclass=EnvironmentEntityMeta):
         return envs.get_current_env()
 
 class Data(EnvironmentEntity):
-    def __init__(self, size) -> None:
-        self.size = size
+    def __init__(self, size: Number) -> None:
+        self.size: Number = size
 
 class LocalData(Data):
     # TODO: Should it be remained?
@@ -39,32 +39,17 @@ class LocalData(Data):
 
 
 class Node(EnvironmentEntity):
-    def __init__(self, data_process_rate: Optional[Number] = None) -> None:
-        self.data_process_rate = data_process_rate
+    def __init__(self) -> None:
         self.total_upload_time = 0
         self.total_download_time = 0
         self.total_compute_time = 0
 
-    async def compute(self, duration: Optional[Number] = None, datasize: Optional[Number] = None) -> None:
+    async def compute(self, duration: Optional[Number]) -> None:
         """[Coroutine] Do local computation. `self.total_compute_time` will be updated acc
 
         Args:
             duration (Optional[Number], optional): Duration. Defaults to None.
-            datasize (Optional[Number], optional): Datasize. Defaults to None.
-
-        Raises:
-            ValueError: Raises when not exactly one of `duration` and `datasize` is not None.
-            ValueError: Raises when `self.data_process_rate` is invalid when needed.
         """
-        if not utils.singular_not_none(datasize, duration):
-            raise ValueError('Only one of `datasie`, `duration` is allowed to have a value.')
-
-        if datasize is not None:
-            if self.data_process_rate is None or self.data_process_rate <= 0:
-                raise ValueError('`data_process_rate` must be a positive number')
-
-            duration = datasize / self.data_process_rate
-
         await envs.sleep(duration)
         self.total_compute_time += duration
 

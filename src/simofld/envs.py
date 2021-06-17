@@ -83,8 +83,9 @@ def get_active_task():
 class Environment:
     _current_env: Optional['Environment'] = None
 
-    def __init__(self, coros: List[Coroutine], initial_time: Number = 0) -> None:
+    def __init__(self, coros: List[Coroutine], initial_time: Number = 0, until: Optional[Number] = None) -> None:
         self.now: Number = initial_time
+        self.until: Optional[Number] = until
         self._coros = coros
         self._active_task: Optional[Task] = None
         self._running_tasks = PriorityQueue() # Initialized using coros in self.run()
@@ -107,6 +108,8 @@ class Environment:
             self.create_task(coro)
         
         while not self._running_tasks.empty():
+            if self.until and self.now > self.until:
+                break
             task: Task = self._running_tasks.get_nowait()
 
             if task._suspended:
@@ -117,7 +120,7 @@ class Environment:
             self._active_task = task
             task.step()
             if task.done:
-                logger.debug('Task done')
+                logger.debug(f'Task done, now {self.now}')
                 if task.callbacks:
                     for callback in task.callbacks:
                         callback()
@@ -134,8 +137,8 @@ class Environment:
         Environment._current_env = self.prev_env
 
 
-def create_env(coros: Optional[List[Coroutine]]=None, initial_time: Number = 0):
-    return Environment(coros if coros else [], initial_time)
+def create_env(coros: Optional[List[Coroutine]]=None, initial_time: Number = 0, until: Optional[Number] = None):
+    return Environment(coros if coros else [], initial_time, until)
 
 
 async def sleep(delay, env: 'Environment' = None):
