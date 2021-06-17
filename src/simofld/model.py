@@ -49,7 +49,7 @@ class Node(EnvironmentEntity):
         """[Coroutine] Do local computation. `self.total_compute_time` will be updated acc
 
         Args:
-            duration (Optional[Number], optional): [description]. Defaults to None.
+            duration (Optional[Number], optional): Duration. Defaults to None.
             datasize (Optional[Number], optional): Datasize. Defaults to None.
 
         Raises:
@@ -80,7 +80,7 @@ class Transmission(envs.Task):
 
 class Channel(EnvironmentEntity):
     def __init__(self) -> None:
-        self.transmission_list = []
+        self.transmission_list: List[Transmission] = []
 
     def datarate_between(self, from_node: Node, to_node: Node) -> Number:
         raise NotImplemented

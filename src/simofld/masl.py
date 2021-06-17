@@ -5,7 +5,7 @@ from typing import List, Optional
 from numbers import Number
 
 import numpy as np
-from numpy import random
+from numpy import log2, random
 
 from . import envs
 from .model import Node, Channel
@@ -34,20 +34,62 @@ SIMULATION_PARAMETERS = {
     'CHANNEL_SCALING_FACTOR': 10**5,
 }
 
-def I():
-    return 1
-
-def Q():
-    return 1
-
 class MobileUser(Node):
-    def __init__(self, data_process_rate: Optional[Number], channels: List[Channel]) -> None:
+    def __init__(self, channels: List[Channel]) -> None:
+        super().__init__()
+
+        self.data_process_rate = 
         self._x = random.random() * 50
         self.lr = SIMULATION_PARAMETERS['LEARNING_RATE']
         self.active_probability = 1 - random.random()
         self.channels = channels
+        self.transmit_power = SIMULATION_PARAMETERS['SIMULATION_PARAMETERS'] # p_i
         self.active = None
-        super().__init__(data_process_rate=data_process_rate)
+
+        # TODO: Make them stochastic
+        self._payoff_weight_energy = 0.5
+        self._payoff_weight_time = 0.5
+
+        self._datasize = SIMULATION_PARAMETERS['DATA_SIZE']
+
+
+
+
+    
+    def _psi(self, bandwidth: Number) -> Number:
+        """Used to calculate `self._I`.
+
+        Args:
+            bandwidth (Number): Bandwidth of chosen channel
+
+        Returns:
+            Number: :math:`\psi`
+        """
+        mu_E = self._payoff_weight_energy
+        mu_T = self._payoff_weight_time
+        p = self.transmit_power
+        C = self._datasize
+        B = bandwidth
+        
+
+        T_loc = C / self.data_process_rate
+        E_loc = T_loc 
+
+        T_clo_2 = C / self.data_process_rate
+
+        n = (mu_E * p + mu_T) * C
+        d = B * (mu_T * T_loc + mu_E * E_loc - mu_T * T_clo_2)
+        return n / d
+
+    def _Q(self, channel: 'RayleighChannel') -> Number:
+        channel_power = channel.channel_power(self)
+        bandwidth = channel.bandwidth
+        psi = self._psi(bandwidth)
+        sigma_0 = SIMULATION_PARAMETERS['BACKGROUND_NOISE']
+        return (channel_power / (2**psi - 1)) - sigma_0
+
+    def _I(self, channel: 'RayleighChannel') -> Number:
+        return channel.total_channel_power() - channel.channel_power(self)
 
     async def perform_cloud_computation(self, cloud_server: 'CloudServer', channel: Channel, upload_duration: Number):
         env = self.get_current_env()
@@ -71,6 +113,10 @@ class MobileUser(Node):
 
         while True:
             self.active = True if random.random() < theta else False
+            
+            # Use this function to stay sync with other nodes
+            await envs.wait_for_simul_tasks()
+
             if self.active:
                 choice_index = random.choice(channel_num + 1, 1, p=w).item()
                 if choice_index == 0: # local execution
@@ -91,10 +137,60 @@ class MobileUser(Node):
                 await envs.sleep(step_lapse)
 
 
+class RayleighChannel(Channel):
+    """A channel that follows Rayleigh fading. Notice that the datarate will also be affected by connected user. 
+    """
+    def __init__(self) -> None:
+        super().__init__()
+        # TODO: Update it periodically
+        self.beta: Number = random.exponential(1) # Rayleigh fading factor
+        self.bandwidth: Number = SIMULATION_PARAMETERS['CHANNEL_BANDWITH']
+
+    def channel_power(self, mobile: MobileUser) -> Number:
+        """It is the :math:`p_i g_{i,o}` in the original paper.
+
+        Args:
+            mobile (MobileUser): Mobile user to be calculated on.
+        Returns:
+            Number: :math:`p_i g_{i,o}`
+        """
+        beta = self.beta
+        alpha = SIMULATION_PARAMETERS['PATH_LOSS_EXPONENT']
+        distance = abs(mobile._x)
+        return mobile.transmit_power * distance**(-alpha) * beta
+    
+    def total_channel_power(self) -> Number:
+        """Total channel_power for active user that are using this channel. :math:`\sum_{i \in \mathcal{A}} p_i g_{i,o}`
+
+        Returns:
+            Number: :math:`\sum_{i \in \mathcal{A}} p_i g_{i,o}`
+        """
+        # TODO: May take irrelevant into account?
+        beta = self.beta
+        tot_power = 0
+        for transmission in self.transmission_list:
+            node = transmission.from_node
+            assert isinstance(node, MobileUser)
+            if node.active:
+                tot_power += self.channel_power(node, beta)
+        return tot_power
+
+
+    def datarate_between(self, mobile: MobileUser, to_node: 'CloudServer') -> Number:
+        beta = self.beta
+        channel_power = self.channel_power(mobile, beta)
+
+        total_channel_power = self.total_channel_power(beta)
+        
+        B = self.bandwidth
+        sigma_0 = SIMULATION_PARAMETERS['BACKGROUND_NOISE']
+
+        return B * log2(1 + channel_power / (total_channel_power - channel_power + sigma_0))
+        
+    
+
+
 class CloudServer(Node):
     def __init__(self, data_process_rate: Number = 1) -> None:
         super().__init__(data_process_rate=data_process_rate)
-        env =  self.get_current_env()
-        if env.g.cloud_server is not None:
-            raise ValueError('Only one cloud server can be set for the env')
-        env.g.cloud_server = self
+
