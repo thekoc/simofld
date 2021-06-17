@@ -1,8 +1,10 @@
 """This module implements MASL-algorithm from:
     J. Zheng, Y. Cai, Y. Wu and X. Shen, "Dynamic Computation Offloading for Mobile Cloud Computing: A Stochastic Game-Theoretic Approach," in IEEE Transactions on Mobile Computing, vol. 18, no. 4, pp. 771-786, 1 April 2019, doi: 10.1109/TMC.2018.2847337.
 """
+import logging
 from typing import List, Optional
 from numbers import Number
+from logging import getLogger
 
 import numpy as np
 from numpy import log2, random
@@ -12,14 +14,14 @@ from .model import LocalData, Node, Channel
 
 SIMULATION_PARAMETERS = {
     # CHART
-    'AP_COVERAGE': 50, # meter
+    'AP_COVERAGE': 1, # meter
     'MOBILE_NUM': 20,
     'MOBILE_ACTIVE_PROBABILITY': 0.9,
     'CHANNEL_NUM': 10,
-    'CHANNEL_BANDWITH': 5, # MHz
-    'TRANSMIT_POWER': 100, # mW
+    'CHANNEL_BANDWITH': 5 * 10**6, # MHz
+    'TRANSMIT_POWER': 100 * 10**-3, # mW
     'PATH_LOSS_EXPONENT': 4,
-    'BACKGROUND_NOISE': -100, # dBm
+    'BACKGROUND_NOISE': 0.1 * 10**-3, # dBm
     'DATA_SIZE': 5000, # KB
     'LOCAL_CPU_CYCLES': 1000 * 10**6, # Megacycles
     'CLOUD_CPU_CYCLES': 1200 * 10**6, # Megacycles
@@ -33,8 +35,10 @@ SIMULATION_PARAMETERS = {
     'LEARNING_RATE': 0.1,
     
     # Channel
-    'CHANNEL_SCALING_FACTOR': 10**5,
+    'CHANNEL_SCALING_FACTOR': 1,
 }
+
+logger = getLogger(__name__)
 
 class MobileUser(Node):
     def __init__(self, channels: List[Channel]) -> None:
@@ -42,11 +46,12 @@ class MobileUser(Node):
         self._x = (1 - random.random()) * 50 # Distance to the AP
         self.lr = SIMULATION_PARAMETERS['LEARNING_RATE']
         self.active_probability = 1 - random.random()
+        self.active_probability = 1
         self.channels = channels
         self.transmit_power = SIMULATION_PARAMETERS['TRANSMIT_POWER'] # p_i
         self.active = None
 
-        self.cpu_frequency = SIMULATION_PARAMETERS['LOCAL_CPU_CAPABILITY'] # Megacycles/s
+        self.cpu_frequency = SIMULATION_PARAMETERS['LOCAL_CPU_CAPABILITY'][0] # Megacycles/s
         self.cpu_effeciency = SIMULATION_PARAMETERS['COMPUTING_ENERGY_EFFECIENCY'][0] # Megacycles/J TODO: Random selection
         # TODO: Make them stochastic
         self._payoff_weight_energy = 0.5
@@ -88,7 +93,7 @@ class MobileUser(Node):
         return (channel_power / (2**psi - 1)) - sigma_0
 
     def _I(self, channel: 'RayleighChannel') -> Number:
-        return channel.total_channel_power() - channel.channel_power(self)
+        return channel.total_channel_power(exclude=self)
 
     async def perform_cloud_computation(self, cloud_server: 'CloudServer', channel: Channel, upload_duration: Number):
         env = self.get_current_env()
@@ -113,17 +118,14 @@ class MobileUser(Node):
         lr = self.lr
         choice_list = [None] + self.channels
         
-        cloud_server = self.get_current_env().g.cloud_server
+        cloud_server: CloudServer = self.get_current_env().g.cloud_server
 
         w = np.full(channel_num + 1, 1 / (channel_num + 1))
         theta = self.active_probability
-        gamma = 10**5
+        gamma = SIMULATION_PARAMETERS['CHANNEL_SCALING_FACTOR']
 
         while True:
             self.active = True if random.random() < theta else False
-            
-            # Use this function to stay sync with other nodes
-            await envs.wait_for_simul_tasks()
 
             if self.active:
                 choice_index = random.choice(channel_num + 1, 1, p=w).item()
@@ -140,8 +142,13 @@ class MobileUser(Node):
                 e = np.zeros(channel_num + 1)
                 e[choice_index] = 1
 
+
                 r = 1 - gamma * payoff
+                print('='*20,'\n', w)
+                print(f'index: {choice_index}, payoff: {payoff}, r: {r}')
                 w = w + lr * r * (e - w)
+                print(w)
+                print('time', cloud_server.total_compute_time)
             else:
                 await envs.sleep(step_lapse)
 
@@ -171,7 +178,7 @@ class RayleighChannel(Channel):
         distance = abs(mobile._x)
         return mobile.transmit_power * distance**(-alpha) * beta
     
-    def total_channel_power(self) -> Number:
+    def total_channel_power(self, exclude: Optional[MobileUser] = None) -> Number:
         """Total channel_power for active user that are using this channel. :math:`\sum_{i \in \mathcal{A}} p_i g_{i,o}`
 
         Returns:
@@ -183,7 +190,7 @@ class RayleighChannel(Channel):
         for transmission in self.transmission_list:
             node = transmission.from_node
             assert isinstance(node, MobileUser)
-            if node.active:
+            if node.active and exclude and exclude is not node:
                 tot_power += self.channel_power(node)
         return tot_power
 
@@ -191,12 +198,13 @@ class RayleighChannel(Channel):
     def datarate_between(self, mobile: MobileUser, to_node: 'CloudServer') -> Number:
         channel_power = self.channel_power(mobile)
 
-        total_channel_power = self.total_channel_power()
-        
+        total_channel_power = self.total_channel_power(exclude=mobile)
+        logging.debug(f'channel_power: {channel_power} total_channel_power: {total_channel_power}')
         B = self.bandwidth
         sigma_0 = SIMULATION_PARAMETERS['BACKGROUND_NOISE']
 
-        return B * log2(1 + channel_power / (total_channel_power - channel_power + sigma_0))
+        result = B * log2(1 + channel_power / (total_channel_power + sigma_0))
+        return result
 
 class CloudServer(Node):
     def __init__(self) -> None:

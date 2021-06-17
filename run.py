@@ -1,34 +1,15 @@
 import sys
-import random
-
 sys.path.insert(0, 'src')
 
-from simofld import envs
-from simofld.envs import Environment, sleep, gather, get_current_env, create_env
+from simofld.masl import CloudServer, MobileUser, RayleighChannel
 
-def test_sleep():
-    async def aprint(s):
-        await sleep(1)
-        print(s)
-        
-    async def func():
-        print('starting...')
-        await sleep(0.5)
-        print(f'ending, current time {get_current_env().now}...')
 
-    with create_env([func()]) as env:
-        env.run()
-
-def test_gather():
-    async def func():
-        print('starting...')
-        random.seed(1)
-        delays = [random.random() for _ in range(2)]
-        await envs.gather([envs.sleep(delay) for delay in delays])
-        pass
-
-    with envs.create_env([func()]) as env:
-        env.run()
+from simofld.envs import create_env
 
 if __name__ == '__main__':
-    test_sleep()
+    channels = [RayleighChannel() for _ in range()]
+    nodes = [MobileUser(channels) for _ in range(2)]
+    cloud_server = CloudServer()
+    with create_env([node.main_loop() for node in nodes], until=10) as env:
+        env.g.cloud_server = cloud_server
+        env.run()

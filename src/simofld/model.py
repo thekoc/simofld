@@ -100,6 +100,6 @@ class Channel(EnvironmentEntity):
         await transmission
         from_node.total_upload_time += duration
         to_node.total_download_time += duration
-
+        await envs.wait_for_simul_tasks()
         self.transmission_list.pop()
         return LocalData(datasize, to_node)

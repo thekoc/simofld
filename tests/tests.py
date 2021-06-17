@@ -1,12 +1,16 @@
-import unittest
-import random
+
 import sys
 sys.path.insert(0, 'src')
+
+import unittest
+import random
+from simofld.masl import CloudServer, MobileUser, RayleighChannel
 from simofld import envs, exceptions
 from simofld.model import Channel, Node
 import simofld.utils as utils
-
-random.seed(0)
+from numpy import random as np_random
+np_random.seed(1)
+random.seed(1)
 
 class TestEventLoop(unittest.TestCase):
     def setUp(self) -> None:
@@ -111,6 +115,7 @@ class TestUtils(unittest.TestCase):
         self.assertFalse(utils.singular_not_none(1, 1, None))
         self.assertFalse(utils.singular_not_none(None, None, None))
         self.assertFalse(None)
+
 
 if __name__ == '__main__':
     unittest.main()
