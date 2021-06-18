@@ -14,15 +14,15 @@ from .model import LocalData, Node, Channel
 
 SIMULATION_PARAMETERS = {
     # CHART
-    'AP_COVERAGE': 1, # meter
+    'AP_COVERAGE': 20, # meter
     'MOBILE_NUM': 20,
     'MOBILE_ACTIVE_PROBABILITY': 0.9,
     'CHANNEL_NUM': 10,
     'CHANNEL_BANDWITH': 5 * 10**6, # MHz
     'TRANSMIT_POWER': 100 * 10**-3, # mW
     'PATH_LOSS_EXPONENT': 4,
-    'BACKGROUND_NOISE': 0.1 * 10**-3, # dBm
-    'DATA_SIZE': 5000, # KB
+    'BACKGROUND_NOISE': 10**-13, # dBm
+    'DATA_SIZE': 5000 * 10**3, # KB
     'LOCAL_CPU_CYCLES': 1000 * 10**6, # Megacycles
     'CLOUD_CPU_CYCLES': 1200 * 10**6, # Megacycles
     'LOCAL_CPU_CAPABILITY': (0.5 * 10**9, 0.8 * 10**9, 1.0 * 10**9), # GHz,
@@ -32,10 +32,10 @@ SIMULATION_PARAMETERS = {
     'COMPUTING_ENERGY_EFFECIENCY': (400 * 10**6, 500 * 10**6, 600 * 10**6), # Megacycles/J
     
     # MOBILE
-    'LEARNING_RATE': 0.1,
+    'LEARNING_RATE': 0.03,
     
     # Channel
-    'CHANNEL_SCALING_FACTOR': 1,
+    'CHANNEL_SCALING_FACTOR': 10000,
 }
 
 logger = getLogger(__name__)
