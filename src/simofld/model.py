@@ -95,12 +95,16 @@ class Channel(EnvironmentEntity):
             duration = duration
             datasize = duration * dr
 
+        await envs.wait_for_simul_tasks()
         transmission = Transmission(from_node, to_node, duration=duration)
         self.transmission_list.append(transmission)
 
+        logger.debug(f'start transmission {transmission.id} from {from_node.id} using channel {self.id}, now: {envs.get_current_env().now}')
         await transmission
         from_node.total_upload_time += duration
         to_node.total_download_time += duration
+        async def pop_transmission():
         await envs.wait_for_simul_tasks()
         self.transmission_list.pop()
+        envs.get_current_env().create_task(pop_transmission())
         return LocalData(datasize, to_node)
