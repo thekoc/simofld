@@ -10,24 +10,6 @@ from . import utils
 
 logger = logging.getLogger(__name__)
 
-class EnvironmentEntityMeta(type):
-    def __new__ (cls, name, bases, namespace):
-        namespace['_instances'] = WeakSet()
-        return super().__new__(cls, name, bases, namespace)
-
-    def __call__(cls, *args, **kwargs):
-        instance = super().__call__(*args, **kwargs)
-        cls._instances.add(instance)
-        return instance
-    
-    @property
-    def instances(cls):
-        return [x for x in cls._instances]
-
-class EnvironmentEntity(metaclass=EnvironmentEntityMeta):
-    def get_current_env(self):
-        return envs.get_current_env()
-
 class Data(EnvironmentEntity):
     def __init__(self, size: Number) -> None:
         self.size: Number = size
@@ -104,7 +86,8 @@ class Channel(EnvironmentEntity):
         from_node.total_upload_time += duration
         to_node.total_download_time += duration
         async def pop_transmission():
-        await envs.wait_for_simul_tasks()
-        self.transmission_list.pop()
+            await envs.wait_for_simul_tasks()
+            logger.debug(f'finished transmission {transmission.id} from {from_node.id} using channel {self.id}, now: {envs.get_current_env().now}')
+            self.transmission_list.pop()
         envs.get_current_env().create_task(pop_transmission())
         return LocalData(datasize, to_node)
