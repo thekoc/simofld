@@ -120,7 +120,8 @@ class MobileUser(Node):
         
         cloud_server: CloudServer = self.get_current_env().g.cloud_server
 
-        w = np.full(channel_num + 1, 1 / (channel_num + 1))
+        self._w = np.full(channel_num + 1, 1 / (channel_num + 1))
+        w = self._w
         theta = self.active_probability
         gamma = SIMULATION_PARAMETERS['CHANNEL_SCALING_FACTOR']
 
@@ -147,8 +148,8 @@ class MobileUser(Node):
                 print('='*20,'\n', w)
                 print(f'index: {choice_index}, payoff: {payoff}, r: {r}')
                 w = w + lr * r * (e - w)
-                print(w)
-                print('time', cloud_server.total_compute_time)
+                self._w = w
+                assert r > 0
             else:
                 await envs.sleep(step_lapse)
 
@@ -190,7 +191,7 @@ class RayleighChannel(Channel):
         for transmission in self.transmission_list:
             node = transmission.from_node
             assert isinstance(node, MobileUser)
-            if node.active and exclude and exclude is not node:
+            if node.active and (exclude is not node):
                 tot_power += self.channel_power(node)
         return tot_power
 
@@ -199,7 +200,6 @@ class RayleighChannel(Channel):
         channel_power = self.channel_power(mobile)
 
         total_channel_power = self.total_channel_power(exclude=mobile)
-        logging.debug(f'channel_power: {channel_power} total_channel_power: {total_channel_power}')
         B = self.bandwidth
         sigma_0 = SIMULATION_PARAMETERS['BACKGROUND_NOISE']
 
