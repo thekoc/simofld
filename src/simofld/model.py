@@ -5,6 +5,7 @@ from weakref import WeakSet
 
 
 from . import envs
+from .envs import EnvironmentEntity
 from . import utils
 
 logger = logging.getLogger(__name__)
@@ -62,7 +63,6 @@ class Transmission(envs.Task):
         self.from_node = from_node
         self.to_node = to_node
 
-
 class Channel(EnvironmentEntity):
     def __init__(self) -> None:
         self.transmission_list: List[Transmission] = []
@@ -86,6 +86,7 @@ class Channel(EnvironmentEntity):
             raise ValueError('Only one of `datasie`, `duration` is allowed to have a value.')
 
         dr = self.datarate_between(from_node, to_node)
+
         assert isinstance(dr, Number)
 
         if datasize is not None:

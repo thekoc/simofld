@@ -2,16 +2,41 @@ import logging
 from queue import PriorityQueue
 from numbers import Number
 from typing import Callable, Optional, List, Coroutine
+from weakref import WeakSet
 
 from . import exceptions
 
 logger = logging.getLogger(__name__)
 
+class EnvironmentEntityMeta(type):
+    def __new__ (cls, name, bases, namespace):
+        namespace['_instances'] = WeakSet()
+        namespace['_count'] = 1
+        return super().__new__(cls, name, bases, namespace)
+
+    def __call__(cls, *args, **kwargs):
+        instance = super().__call__(*args, **kwargs)
+        cls._instances.add(instance)
+        instance._id = cls._count
+        cls._count += 1
+        return instance
+    
+    @property
+    def instances(cls):
+        return [x for x in cls._instances]
+
+class EnvironmentEntity(metaclass=EnvironmentEntityMeta):
+    def get_current_env(self):
+        return get_current_env()
+    
+    @property
+    def id(self) -> Number:
+        return self._id
+
 class EnvironmentStorage:
     pass
 
-class Task:
-    _next_id = 0
+class Task(EnvironmentEntity):
     def __init__(self, coro: Optional[Coroutine], wait_until: Optional[Number] = None, callbacks: Optional[List[Callable]] = []):
         """Init a task. Don't call it directly.
 
@@ -20,8 +45,6 @@ class Task:
             wait_until (Optional[Number], optional): When should the task be scheduled. If None, the task will be executed once started. Defaults to None.
             callbacks (Optional[List[Callable]], optional): Set it to None if return to the parent coroutine is not wanted. Defaults to [].
         """
-        self.id = type(self)._next_id
-        type(self)._next_id += 1
         self.coro = coro # type: Coroutine
         self.lifespan = None
         self._done = False
@@ -66,9 +89,6 @@ class Task:
         yield self
         self.lifespan = (start, env.now)
         return self
-
-    def __eq__(self, other):
-        return self.wait_until == other.wait_until and self.id == other.id
 
     def __lt__(self, other: 'Task'):
         if self.wait_until == other.wait_until:
