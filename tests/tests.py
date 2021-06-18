@@ -1,4 +1,5 @@
 
+from queue import Queue
 import sys
 sys.path.insert(0, 'src')
 
@@ -47,6 +48,22 @@ class TestEventLoop(unittest.TestCase):
 
         with envs.create_env([coro()]) as env:
             env.run()
+    
+    def test_keep_order(self):
+        q = []
+        async def add_queue(i):
+            q.append(i)
+
+        async def coro():
+            env = envs.get_current_env()
+            for i in range(100):
+                env.create_task(add_queue(i))
+
+            await envs.sleep(1)
+            self.assertEqual(q, list(range(100)))
+        with envs.create_env([coro()]) as env:
+            env.run()
+
 
 class TestModel(unittest.TestCase):
     def test_channel(self):

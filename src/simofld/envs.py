@@ -6,12 +6,12 @@ from typing import Callable, Optional, List, Coroutine
 from . import exceptions
 
 logger = logging.getLogger(__name__)
-logger.setLevel(logging.DEBUG)
 
 class EnvironmentStorage:
     pass
 
 class Task:
+    _next_id = 0
     def __init__(self, coro: Optional[Coroutine], wait_until: Optional[Number] = None, callbacks: Optional[List[Callable]] = []):
         """Init a task. Don't call it directly.
 
@@ -20,6 +20,8 @@ class Task:
             wait_until (Optional[Number], optional): When should the task be scheduled. If None, the task will be executed once started. Defaults to None.
             callbacks (Optional[List[Callable]], optional): Set it to None if return to the parent coroutine is not wanted. Defaults to [].
         """
+        self.id = type(self)._next_id
+        type(self)._next_id += 1
         self.coro = coro # type: Coroutine
         self.lifespan = None
         self._done = False
@@ -66,10 +68,17 @@ class Task:
         return self
 
     def __eq__(self, other):
-        return self.wait_until == other.wait_until
+        return self.wait_until == other.wait_until and self.id == other.id
 
-    def __lt__(self, other):
-        return self.wait_until is None or self.wait_until < other.wait_until
+    def __lt__(self, other: 'Task'):
+        if self.wait_until == other.wait_until:
+            return self.id < other.id
+        if self.wait_until is None:
+            return True
+        elif other.wait_until is None:
+            return False
+        else:
+            return self.wait_until < other.wait_until
 
 def get_current_env():
     if Environment._current_env is not None:
@@ -119,6 +128,8 @@ class Environment:
                 self.now = max(task.wait_until, self.now)
             self._active_task = task
             task.step()
+            logger.debug(f'Task step, now {self.now}')
+
             if task.done:
                 logger.debug(f'Task done, now {self.now}')
                 if task.callbacks:
