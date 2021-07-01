@@ -105,7 +105,7 @@ class MobileUser(Node):
         cloud_server: CloudServer = self.get_current_env().g.cloud_server
         return cloud_server
 
-    def cloud_cost(self, channel: Channel) -> Number:
+    def cloud_cost(self, channel: 'RayleighChannel') -> Number:
         mu_E = self._payoff_weight_energy
         mu_T = self._payoff_weight_time
         C = self._datasize
