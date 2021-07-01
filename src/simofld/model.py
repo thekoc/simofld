@@ -1,11 +1,9 @@
 import logging
 from numbers import Number
 from typing import List, Optional
-from weakref import WeakSet
-
 
 from . import envs
-from .envs import EnvironmentEntity
+from .envs import Environment, EnvironmentEntity
 from . import utils
 
 logger = logging.getLogger(__name__)
@@ -19,7 +17,6 @@ class LocalData(Data):
     def __init__(self, size, owner: 'Node') -> None:
         super().__init__(size)
         self.owner = owner
-
 
 class Node(EnvironmentEntity):
     def __init__(self) -> None:
@@ -91,3 +88,24 @@ class Channel(EnvironmentEntity):
             self.transmission_list.pop()
         envs.get_current_env().create_task(pop_transmission())
         return LocalData(datasize, to_node)
+
+class Profile:
+    def __init__(self, sample_interval: Number) -> None:
+        self.sample_interval = sample_interval
+
+    async def async_sample(self):
+        while True:
+            self.sample()
+            await envs.sleep(self.sample_interval)
+
+    def sample(self):
+        raise NotImplemented
+
+class SimulationEnvironment(Environment):
+    def __init__(self, nodes: List[Node], until: Number, profile: Optional[Profile] = None) -> None:
+        coros = [node.main_loop() for node in nodes]
+        p_list = [0 for _ in nodes]
+        if profile:
+            coros += [profile.async_sample()]
+            p_list += [1]
+        super().__init__(coros, priority_list=p_list, initial_time=0, until=until)

@@ -5,12 +5,13 @@ import logging
 from typing import List, Optional
 from numbers import Number
 from logging import getLogger
+from matplotlib import pyplot as plt
 
 import numpy as np
 from numpy import log2, random
 
 from . import envs
-from .model import LocalData, Node, Channel
+from .model import LocalData, Node, Channel, Profile, SimulationEnvironment
 
 SIMULATION_PARAMETERS = {
     # CHART
@@ -230,3 +231,50 @@ class CloudServer(Node):
     def __init__(self) -> None:
         super().__init__()
         self.cpu_frequency: Number = SIMULATION_PARAMETERS['CLOUD_CPU_CAPABILITY'] # Megacycles/s
+
+class MASLProfile(Profile):
+    def __init__(self, nodes: List[MobileUser], sample_interval: Number) -> None:
+        self.nodes = nodes
+        self._system_wide_cost_samples = []
+        self._node_costs = [[] for _ in nodes]
+        self._node_choices = [[] for _ in nodes]
+        super().__init__(sample_interval)
+        
+    def sample(self):
+        logger.debug('Sampling...')
+        channels = self.nodes[0].channels
+        for channel in channels:
+            logger.debug(f'Channel: {channel.id}')
+            for transmission in channel.transmission_list:
+                logger.debug(f'{transmission.from_node.id}')
+        
+        nodes = self.nodes
+        for i, node in enumerate(nodes):
+            self._node_costs[i].append(node.expectation_cost())
+            self._node_choices[i].append(node._choice_index)
+        self._system_wide_cost_samples.append(self.system_wide_cost(nodes))
+
+    def system_wide_cost(self, nodes: List[MobileUser]):
+        total_cost = 0
+        for mobile in nodes:
+            total_cost += mobile.expectation_cost()
+        return total_cost
+    
+    def show_figures(self):
+        # System-wide cost
+        fig, ax = plt.subplots()
+        ax.plot(self._system_wide_cost_samples)
+        for i in range(len(self.nodes)):
+            pass
+            # ax.plot([n * 10 for n in self._node_costs[i]], label=f'cost of node {self.nodes[i].id}')
+            # ax.plot(self._node_choices[i], label=f'choice of node {self.nodes[i].id}')
+            
+        plt.legend(loc='lower center')
+        plt.show()
+
+def create_env(users: List[MobileUser], cloud_server: CloudServer, profile: MASLProfile, until: Number, step_interval: Number):
+    env = SimulationEnvironment(users, until, profile)
+    env.g.cloud_server = cloud_server
+    env.g.step_interval = step_interval
+    return env
+    
