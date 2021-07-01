@@ -43,7 +43,9 @@ logger = getLogger(__name__)
 class MobileUser(Node):
     def __init__(self, channels: List[Channel]) -> None:
         super().__init__()
-        self._x = (1 - random.random()) * 50 # Distance to the AP
+        self._x = (1 - random.random()) * SIMULATION_PARAMETERS['AP_COVERAGE'] # Distance to the AP
+        self._w = None
+        self._w_history = []
         self.lr = SIMULATION_PARAMETERS['LEARNING_RATE']
         self.active_probability = 1 - random.random()
         self.active_probability = 1
@@ -114,7 +116,7 @@ class MobileUser(Node):
 
     async def main_loop(self):
         channel_num = len(self.channels)
-        step_lapse = 1
+        step_lapse = 0.01
         lr = self.lr
         choice_list = [None] + self.channels
         
@@ -132,23 +134,39 @@ class MobileUser(Node):
                 choice_index = random.choice(channel_num + 1, 1, p=w).item()
 
                 if choice_index == 0: # local execution
+                    logger.debug(f'Calculating Q for user {self.id}')
+                    ongoing_trans = None
                     payoff = self._Q()
                     await self.perform_local_computation(step_lapse)
+                    logger.debug(f'Q: {payoff}')
+                    logger.debug(f'I: {self._I(self.channels[0])}')
+
                     
                 else: # cloud execution
                     channel = choice_list[choice_index]
-                    await self.perform_cloud_computation(cloud_server, channel, step_lapse)
+                    ongoing_trans = [t.from_node.id for t in channel.transmission_list]
+
                     payoff = self._I(channel)
+                    logger.debug(f'Calculating I for user {self.id}, result:{payoff},  channel: {channel.id} list: {ongoing_trans}')
+
+                    await self.perform_cloud_computation(cloud_server, channel, step_lapse)
+                    logger.debug(f'I: {payoff}')
 
                 e = np.zeros(channel_num + 1)
                 e[choice_index] = 1
 
+                logger.debug('='*20)
+                logger.debug(f'User {self.id}, x: {self._x} chooses channel {choice_index}, now: {envs.get_current_env().now}')
+                logger.debug(f'onging trans {ongoing_trans}')
 
+                logger.debug(w)
                 r = 1 - gamma * payoff
-                print('='*20,'\n', w)
-                print(f'index: {choice_index}, payoff: {payoff}, r: {r}')
+                logger.debug(f'index: {choice_index}, payoff: {payoff}, r: {r}')
+                logger.debug(f'time: {cloud_server.total_compute_time}')
+                logger.debug('='*20 + '\n'*2)
                 w = w + lr * r * (e - w)
                 self._w = w
+                self._w_history.append(w)
                 assert r > 0
             else:
                 await envs.sleep(step_lapse)
@@ -177,7 +195,9 @@ class RayleighChannel(Channel):
         beta = cls.beta
         alpha = SIMULATION_PARAMETERS['PATH_LOSS_EXPONENT']
         distance = abs(mobile._x)
-        return mobile.transmit_power * distance**(-alpha) * beta
+        result = mobile.transmit_power * distance**(-alpha) * beta
+        logger.debug(f'chnnel power {result}, beta {beta}')
+        return result
     
     def total_channel_power(self, exclude: Optional[MobileUser] = None) -> Number:
         """Total channel_power for active user that are using this channel. :math:`\sum_{i \in \mathcal{A}} p_i g_{i,o}`
