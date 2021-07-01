@@ -37,7 +37,7 @@ class EnvironmentStorage:
     pass
 
 class Task(EnvironmentEntity):
-    def __init__(self, coro: Optional[Coroutine], wait_until: Optional[Number] = None, callbacks: Optional[List[Callable]] = []):
+    def __init__(self, coro: Optional[Coroutine], priority: Number = 0, wait_until: Optional[Number] = None, callbacks: Optional[List[Callable]] = []):
         """Init a task. Don't call it directly.
 
         Args:
@@ -47,6 +47,7 @@ class Task(EnvironmentEntity):
         """
         self.coro = coro # type: Coroutine
         self.lifespan = None
+        self.priority = priority
         self._done = False
         self._started = False
         self._suspended = False
@@ -92,7 +93,10 @@ class Task(EnvironmentEntity):
 
     def __lt__(self, other: 'Task'):
         if self.wait_until == other.wait_until:
-            return self.id < other.id
+            if self.priority == other.priority:
+                return self.id < other.id
+            else:
+                return self.priority < other.priority
         if self.wait_until is None:
             return True
         elif other.wait_until is None:
@@ -112,10 +116,11 @@ def get_active_task():
 class Environment:
     _current_env: Optional['Environment'] = None
 
-    def __init__(self, coros: List[Coroutine], initial_time: Number = 0, until: Optional[Number] = None) -> None:
+    def __init__(self, coros: List[Coroutine], initial_time: Number = 0, until: Optional[Number] = None, priority_list=None) -> None:
         self.now: Number = initial_time
         self.until: Optional[Number] = until
         self._coros = coros
+        self._priority_list = priority_list
         self._active_task: Optional[Task] = None
         self._running_tasks = PriorityQueue() # Initialized using coros in self.run()
         self.prev_env: Optional[Environment] = None
@@ -126,15 +131,19 @@ class Environment:
         task._started = True
         return task
     
-    def create_task(self, coro: Coroutine, delay: Optional[Number] = 0, callbacks: Optional[List[Callable]] = [], start: bool = True):
-        task = Task(coro=coro, wait_until=self.now + delay, callbacks=callbacks)
+    def create_task(self, coro: Coroutine, delay: Optional[Number] = 0, callbacks: Optional[List[Callable]] = [], start: bool = True, priority: Number = 0):
+        task = Task(coro=coro, priority=priority, wait_until=self.now + delay, callbacks=callbacks)
         if start:
             self.start_task(task)
         return task
 
     def run(self):
-        for coro in self._coros:
-            self.create_task(coro)
+        if self._priority_list:
+            for coro, priority in zip(self._coros, self._priority_list):
+                self.create_task(coro=coro, priority=priority)
+        else:
+            for coro in self._coros:
+                self.create_task(coro)
         
         while not self._running_tasks.empty():
             if self.until and self.now > self.until:
