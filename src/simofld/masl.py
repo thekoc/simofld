@@ -3,6 +3,7 @@
 """
 import logging
 from typing import List, Optional
+from functools import lru_cache
 from numbers import Number
 from logging import getLogger
 from matplotlib import pyplot as plt
@@ -41,17 +42,24 @@ SIMULATION_PARAMETERS = {
 
 logger = getLogger(__name__)
 
+@lru_cache(maxsize=999)
+def _generate_rayleigh_factor(mobile, getnow):
+    # return 1
+    beta = random.exponential(1)
+    # logger.info(f'********\nid: {mobile}, now: {envs.get_current_env().now}, beta: {beta}*********\n')
+    return beta
+
 class MobileUser(Node):
     def __init__(self, channels: List[Channel]) -> None:
         super().__init__()
-        self._x = 20 + (1 - random.random()) * SIMULATION_PARAMETERS['AP_COVERAGE'] # Distance to the AP
-        self._x = 5
+        self._x = 10 + (1 - random.random()) * SIMULATION_PARAMETERS['AP_COVERAGE'] # Distance to the AP
+        # self._x = 10
         self._w = None
         self._choice_index = None
         self._w_history = []
         self.lr = SIMULATION_PARAMETERS['LEARNING_RATE']
         self.active_probability = 1 - random.random()
-        self.active_probability = 1
+        # self.active_probability = 1
         self.channels = channels
         self.transmit_power = SIMULATION_PARAMETERS['TRANSMIT_POWER'] # p_i
         self.active = None
@@ -212,10 +220,17 @@ class MobileUser(Node):
                 logger.debug(f'index: {choice_index}, payoff: {payoff}, r: {r}')
                 logger.debug(f'time: {cloud_server.total_compute_time}')
                 logger.debug('='*20 + '\n'*2)
+                if r < 0:
+                    logger.warning(f'Genrating r < 0: {r}, choice: {choice_index}, payoff: {payoff}, beta: {_generate_rayleigh_factor(self.id, envs.get_current_env().now)}')
+                    r = 0
+                elif r > 1:
+                    logger.warning(f'Genrating r > 1: {r}, choice: {choice_index}, payoff: {payoff}, beta: {_generate_rayleigh_factor(self.id, envs.get_current_env().now)}')
+                    r = 1
                 w = w + lr * r * (e - w)
                 self._w = w
                 self._w_history.append(w)
-                assert r > 0
+
+                # assert r > 0
             else:
                 await envs.sleep(step_interval)
 
@@ -241,10 +256,11 @@ class RayleighChannel(Channel):
             Number: :math:`p_i g_{i,o}`
         """
         beta = cls.beta
+        beta = _generate_rayleigh_factor(mobile.id, envs.get_current_env().now)
         alpha = SIMULATION_PARAMETERS['PATH_LOSS_EXPONENT']
         distance = abs(mobile._x)
         result = mobile.transmit_power * distance**(-alpha) * beta
-        logger.debug(f'chnnel power {result}, beta {beta}')
+        # logger.debug(f'chnnel power {result}, beta {beta}')
         return result
     
     def total_channel_power(self, exclude: Optional[MobileUser] = None) -> Number:
