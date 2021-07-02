@@ -254,7 +254,6 @@ class RayleighChannel(Channel):
             Number: :math:`\sum_{i \in \mathcal{A}} p_i g_{i,o}`
         """
         # TODO: May take irrelevant into account?
-        beta = self.beta
         tot_power = 0
         for transmission in self.transmission_list:
             node = transmission.from_node

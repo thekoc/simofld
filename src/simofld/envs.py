@@ -1,10 +1,13 @@
 import logging
+import sys
 from queue import PriorityQueue
 from numbers import Number
 from typing import Callable, Optional, List, Coroutine
 from weakref import WeakSet
 
 from . import exceptions
+
+TASK_PRIORITY_MAX_NUMBER = 9999999
 
 logger = logging.getLogger(__name__)
 
@@ -187,10 +190,12 @@ async def sleep(delay, env: 'Environment' = None):
 
     return await env.create_task(None, delay)
 
-async def wait_for_simul_tasks():
+async def wait_for_simul_tasks(env: 'Environment' = None):
     """Wait for other tasks that are scheduled for the same time.
     """
-    return await sleep(0)
+    if env is None:
+        env = get_current_env()
+    return await env.create_task(coro=None, delay=0, priority=TASK_PRIORITY_MAX_NUMBER)
 
 
 async def gather(coros, env: 'Environment' = None):
