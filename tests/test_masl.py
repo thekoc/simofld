@@ -1,10 +1,14 @@
 
+from numbers import Number
 import sys
+import time
 from pathlib import Path
+from typing import NamedTuple
 src = Path(__file__).absolute().parent.parent.joinpath('src')
 sys.path.insert(0, str(src))
 
 import unittest
+from multiprocessing import Pool, Queue
 import json
 from simofld.masl import CloudServer, MASLProfile, MobileUser, RayleighChannel, create_env
 from simofld.masl import SIMULATION_PARAMETERS
@@ -16,18 +20,21 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 
-UNTIL = 600
+UNTIL = 3
 
-def test_paramater(gamma, lr, until, mobile_n=10, channel_n=5):
+TestParameters = NamedTuple('TestParameters', [('group', str), ('gamma', Number), ('lr', Number), ('until', Number), ('user_num', int), ('channel_num', int)])
+
+
+def test_paramater(parameters: TestParameters):
     np_random.seed(5)
-    SIMULATION_PARAMETERS['CHANNEL_SCALING_FACTOR'] = gamma
-    SIMULATION_PARAMETERS['LEARNING_RATE'] = lr
-    channels = [RayleighChannel() for _ in range(channel_n)]
-    nodes = [MobileUser(channels) for _ in range(mobile_n)]
+    SIMULATION_PARAMETERS['CHANNEL_SCALING_FACTOR'] = parameters.gamma
+    SIMULATION_PARAMETERS['LEARNING_RATE'] = parameters.lr
+    channels = [RayleighChannel() for _ in range(parameters.channel_num)]
+    nodes = [MobileUser(channels) for _ in range(parameters.user_num)]
     profile = MASLProfile(nodes, 1)
     step_interval = 1
     cloud_server = CloudServer()
-    with create_env(nodes, cloud_server, profile, until=until, step_interval=step_interval) as env:
+    with create_env(nodes, cloud_server, profile, until=parameters.until, step_interval=step_interval) as env:
         env.run()
     
     for node in nodes:
@@ -41,69 +48,56 @@ def test_paramater(gamma, lr, until, mobile_n=10, channel_n=5):
     }
     return result
 
+
+q = Queue(maxsize=1)
+q.put(0)
+
+def task(p):
+    result = test_paramater(p)
+    count = q.get()
+    print('='*20 + '\n' + str(count + 1))
+    q.put(count + 1)
+    return result
+
 class TestMASL(unittest.TestCase):
-    def test_main_algorithm_gamma(self):
-
+    def test_main_algorithm(self):
         until = UNTIL
         result_list = []
-        ## Gamma
-        cost_list = []
-        gammas = [10**4, 10**5, 10**6, 10**7]
-        for gamma in gammas:
-            lr = 0.1
-            mobile_n = 20
-            channel_n = 7
-            result = test_paramater(gamma, lr, until=until, mobile_n=mobile_n, channel_n=channel_n)
-            cost_list.append(result['system_cost_histogram'])
-            result_list.append(dict(gamma=gamma, lr=lr, until=until, mobile_n=mobile_n, channel_n=channel_n, result=result))
-        
-        fig, ax = plt.subplots()
+        user_num = 20
+        channel_num = 7
 
-        for cost, gamma in zip(cost_list, gammas):
-            # ax.plot(cost, label=f'1 gamma: {gamma:e}')
-            step = 1
-            Y = np.convolve(cost, np.ones(step)/step, mode='valid')
-            ax.plot(Y, label=f'gamma: {gamma:e}')
-        ax.set_ylim(bottom=0)
-        ax.legend(loc='best')
-        plt.savefig('gamma.png')
-        with open('results_gamma.json', 'w') as f:
+        test_parameters_list = [
+            TestParameters(group='gamma', gamma=5 * 10**4, lr=0.1, until=until, user_num=user_num, channel_num=channel_num),
+            TestParameters(group='gamma', gamma=10**5, lr=0.1, until=until, user_num=user_num, channel_num=channel_num),
+            TestParameters(group='gamma', gamma=5 * 10**5, lr=0.1, until=until, user_num=user_num, channel_num=channel_num),
+            TestParameters(group='gamma', gamma=10**6, lr=0.1, until=until, user_num=user_num, channel_num=channel_num),
+
+            TestParameters(group='lr', gamma=10**5, lr=0.06, until=until, user_num=user_num, channel_num=channel_num),
+            TestParameters(group='lr', gamma=10**5, lr=0.1, until=until, user_num=user_num, channel_num=channel_num),
+            TestParameters(group='lr', gamma=10**5, lr=0.3, until=until, user_num=user_num, channel_num=channel_num),
+            TestParameters(group='lr', gamma=10**5, lr=0.5, until=until, user_num=user_num, channel_num=channel_num),
+        ]
+
+
+
+        # with Pool(2) as p:
+        #     results = p.map(task, test_parameters_list)
+
+        results = []
+        for p in test_parameters_list[:1]:
+            results += [task(p)]
+        
+        result_list = list(zip([p._asdict() for p in test_parameters_list], results))
+        with open(f'results-{time.strftime("%Y%m%d-%H%M%S")}.json', 'w') as f:
             json.dump(result_list, f)
 
-    def test_main_algorithm_lr(self):
-        until = UNTIL
-        ## Learning Rate
-        result_list = []
-        cost_list = []
-        lr_list = [0.05, 0.1, 0.3, 0.5]
-        for lr in lr_list:
-            gamma = 10**5
-            mobile_n = 20
-            channel_n = 7
-            result = test_paramater(gamma, lr, until=until, mobile_n=mobile_n, channel_n=channel_n)
-            cost_list.append(result['system_cost_histogram'])
-            result_list.append(dict(gamma=gamma, lr=lr, until=until, mobile_n=mobile_n, channel_n=channel_n, result=result))
-        
-        fig, ax = plt.subplots()
+        # for parameters in test_parameters_list:
+        #     result = test_paramater(gamma=parameters.gamma, lr=parameters.lr, until=until, mobile_n=parameters.user_num, channel_n=parameters.channel_num)
+        #     result_list.append(dict(parameters=parameters, result=result))
+        #     # checkpoint
+        #     with open('results.json', 'w') as f:
+        #         json.dump(result_list, f)
 
-        for cost, lr in zip(cost_list, lr_list):
-            step = 1
-            Y = np.convolve(cost, np.ones(step)/step, mode='valid')
-            ax.plot(Y, label=f'lr: {lr:e}')
-        ax.set_ylim(bottom=0)
-        ax.legend(loc='best')
-        plt.savefig('lr.png')
-        
-        with open('results_lr.json', 'w') as f:
-            json.dump(result_list, f)
-        # plt.tight_layout()
-        # plt.show()
-        # fig, ax = plt.subplots()
-        # for i in range(len(channels) + 1):
-        #     ax.plot([w[i] for w in nodes[0]._w_history])
-        # ax.legend(loc='best')
-        # plt.show()
-    
     def test_main_algorithm_user_channel_numbers(self):
         pass
         ## User number
@@ -136,6 +130,7 @@ class TestMASL(unittest.TestCase):
         # ax2.set_ylabel('Beneficial user number')
         # ax2.set_xlabel('Channel number')
 
+print(__name__)
 
 if __name__ == '__main__':
-    unittest.main()
+    TestMASL().test_main_algorithm()

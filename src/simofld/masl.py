@@ -2,6 +2,7 @@
     J. Zheng, Y. Cai, Y. Wu and X. Shen, "Dynamic Computation Offloading for Mobile Cloud Computing: A Stochastic Game-Theoretic Approach," in IEEE Transactions on Mobile Computing, vol. 18, no. 4, pp. 771-786, 1 April 2019, doi: 10.1109/TMC.2018.2847337.
 """
 import logging
+import time
 from typing import List, Optional
 from functools import lru_cache
 from numbers import Number
@@ -42,9 +43,23 @@ SIMULATION_PARAMETERS = {
 
 logger = getLogger(__name__)
 
+approx_betas = np.linspace(0.5, 5, 10)
+def _generate_exponential(size: Number):
+    return 1 if size <= 1 else [1 for _ in range(size)]
+    def _map(v: Number):
+        if v > 5:
+            return 5
+        for n in approx_betas:
+            if v <= n:
+                return n
+    if size == 1:
+        return _map(random.standard_exponential(1))
+    else:
+        return [_map(v) for v in random.standard_exponential(size)]
+
 @lru_cache(maxsize=999)
 def _generate_rayleigh_factor(mobile, getnow):
-    beta = random.exponential(1)
+    beta = _generate_exponential(1)
     return beta
 
 class MobileUser(Node):
@@ -248,20 +263,20 @@ class RayleighChannel(Channel):
     bandwidth: Number = SIMULATION_PARAMETERS['CHANNEL_BANDWITH']
     generate_random_var_locally = False
     _p_beta = 0
-    _beta_cache = random.standard_exponential(10000)
+    _beta_cache = _generate_exponential(10000)
     def __init__(self) -> None:
         super().__init__()
 
     @classmethod
-    def _get_rayleigh_factor(cls, mobile, now):
+    def _get_rayleigh_factor(cls, mobile_id, now):
         if cls.generate_random_var_locally:
             beta = cls._beta_cache[cls._p_beta]
             cls._p_beta += 1
             if cls._p_beta >= len(cls._beta_cache):
                 cls._p_beta = 0
-                cls._beta_cache = random.standard_exponential(10000)
+                cls._beta_cache = _generate_exponential(10000)
         else:
-            beta = _generate_rayleigh_factor(mobile, now)
+            beta = _generate_rayleigh_factor(mobile_id, now)
         return beta
     
     @classmethod
@@ -317,10 +332,17 @@ class MASLProfile(Profile):
         self.nodes = nodes
         self._system_wide_cost_samples = []
         self._node_choices = [[] for _ in nodes]
+        self._last_sample_ts = None
         super().__init__(sample_interval)
         
     def sample(self):
         logger.info(f'Sampling..., now: {envs.get_current_env().now}')
+
+        now = time.time()
+        if self._last_sample_ts is not None:
+            logger.info(f'It takes {now - self._last_sample_ts} secs per iteration')
+        self._last_sample_ts = now
+
         logger.debug(f'Channel: 0')
     
         # for node in self.nodes:
@@ -347,7 +369,7 @@ class MASLProfile(Profile):
     def system_wide_cost(self, nodes: List[MobileUser]):
         cloud_server = envs.get_current_env().g.cloud_server
         total_cost = 0
-        epochs = 50000
+        epochs = 100000
 
         datarates = {node.id: [] for node in nodes}
         
