@@ -170,10 +170,10 @@ class MobileUser(Node):
         choice_index = random.choice(len(self.channels) + 1, 1, p=self._w).item() 
         return choice_index
 
-    async def perform_cloud_computation(self, cloud_server: 'CloudServer', channel: Channel, upload_duration: Number):
+    async def perform_cloud_computation(self, cloud_server: 'CloudServer', channel: Channel, upload_duration: Number, datarate: Number):
         env = self.get_current_env()
-        data = await channel.transfer_data(self, cloud_server, duration=upload_duration)
-        transmission_datasize = data.size
+        await envs.sleep(upload_duration)
+        transmission_datasize = datarate * upload_duration
 
         # TODO: Make this more readable
         total_size = SIMULATION_PARAMETERS['DATA_SIZE']
@@ -199,6 +199,8 @@ class MobileUser(Node):
         theta = self.active_probability
         gamma = SIMULATION_PARAMETERS['CHANNEL_SCALING_FACTOR']
 
+        last_transmission: Transmission = None
+
         while True:
             self.active = True if random.random() < theta else False
             choice_index = self.generate_choice_index()
@@ -208,19 +210,30 @@ class MobileUser(Node):
                     logger.debug(f'Calculating Q for user {self.id}')
                     ongoing_trans = None
                     payoff = self._Q()
+                    await envs.wait_for_simul_tasks()
+
+                    if last_transmission:
+                        last_transmission.disconnect()
+                        last_transmission = None
+
                     await self.perform_local_computation(step_interval)
                     logger.debug(f'Q: {payoff}')
-                    logger.debug(f'I: {self._I(self.channels[0])}')
-
                     
                 else: # cloud execution
-                    channel = choice_list[choice_index]
+                    channel: Channel = choice_list[choice_index]
                     ongoing_trans = [t.from_node.id for t in channel.transmission_list]
 
                     payoff = self._I(channel)
+                    dr = channel.datarate_between(self, cloud_server)
                     logger.debug(f'Calculating I for user {self.id}, result:{payoff},  channel: {channel.id} list: {ongoing_trans}')
 
-                    await self.perform_cloud_computation(cloud_server, channel, step_interval)
+                    await envs.wait_for_simul_tasks()
+                    if last_transmission:
+                        last_transmission.disconnect()
+                        last_transmission = None
+
+                    last_transmission = channel.connect(self, cloud_server)
+                    await self.perform_cloud_computation(cloud_server, channel, step_interval, dr)
                     logger.debug(f'I: {payoff}')
 
                 e = np.zeros(channel_num + 1)
@@ -232,14 +245,14 @@ class MobileUser(Node):
 
                 logger.debug(w)
                 r = 1 - gamma * payoff
-                logger.debug(f'index: {choice_index}, payoff: {payoff}, r: {r}')
+                logger.debug(f'index: {choice_index}, payoff: {payoff}, r: {r}, x: {self._x}')
                 logger.debug(f'time: {cloud_server.total_compute_time}')
                 logger.debug('='*20 + '\n'*2)
                 if r < 0:
-                    logger.warning(f'Genrating r < 0: {r}, choice: {choice_index}, payoff: {payoff}, beta: {_generate_rayleigh_factor(self.id, envs.get_current_env().now)} now: {envs.get_current_env().now}')
+                    logger.warning(f'Genrating r < 0: {r}, gamma: {gamma}, lr: {lr}, choice: {choice_index}, payoff: {payoff}, beta: {_generate_rayleigh_factor(self.id, envs.get_current_env().now)} now: {envs.get_current_env().now}')
                     # r = 0
                 elif r > 1:
-                    logger.warning(f'Genrating r > 1: {r}, choice: {choice_index}, payoff: {payoff}, beta: {_generate_rayleigh_factor(self.id, envs.get_current_env().now)}')
+                    logger.warning(f'Genrating r > 1: {r}, gamma: {gamma}, lr: {lr}, choice: {choice_index}, payoff: {payoff}, beta: {_generate_rayleigh_factor(self.id, envs.get_current_env().now)}')
                     # r = 1
                 new_w = w + lr * r * (e - w)
 
@@ -254,6 +267,11 @@ class MobileUser(Node):
 
                 # assert r > 0
             else:
+                await envs.wait_for_simul_tasks()
+                if last_transmission:
+                    last_transmission.disconnect()
+                    last_transmission = None
+
                 await envs.sleep(step_interval)
 
 
@@ -306,7 +324,7 @@ class RayleighChannel(Channel):
         for transmission in self.transmission_list:
             node = transmission.from_node
             assert isinstance(node, MobileUser)
-            if node.active and (exclude is not node):
+            if node.active and (exclude.id != node.id):
                 tot_power += self.channel_power(node)
                 
         return tot_power
@@ -330,6 +348,11 @@ class CloudServer(Node):
 class MASLProfile(Profile):
     def __init__(self, nodes: List[MobileUser], sample_interval: Number) -> None:
         self.nodes = nodes
+
+        # Prepare vectors for system-wide cost calculation
+        alpha = SIMULATION_PARAMETERS['PATH_LOSS_EXPONENT']
+        self.channel_powers_0 = np.array([20**(-alpha) * node.transmit_power for node in nodes]) # channel powers divied by respective rayleigh fading factors
+
         self._system_wide_cost_samples = []
         self._node_choices = [[] for _ in nodes]
         self._last_sample_ts = None
@@ -403,6 +426,39 @@ class MASLProfile(Profile):
             else:
                 total_cost += node.active_probability * node.cloud_cost(avg_datarates[node.id])
         return total_cost
+    
+    def system_wide_cost_vectorized(self):
+        epochs = 10000
+
+        betas: np.ndarray = random.standard_exponential((epochs, len(self.nodes)))
+        betas = np.ceil(betas * 2) / 2
+
+        active_probabilities = np.array([node.active_probability for node in self.nodes])
+        activeness_v: np.ndarray = random.random((epochs, len(self.nodes))) < active_probabilities
+
+        channel_powers: np.ndarray = self.channel_powers_0 * betas
+        assert channel_powers.shape == (epochs, len(self.nodes))
+
+        active_channel_powers = channel_powers * activeness_v
+        
+        total_channel_powers: np.ndarray = np.sum(active_channel_powers, axis=1)
+        assert total_channel_powers.shape == (epochs,)
+        total_channel_powers = total_channel_powers.repeat(len(self.nodes)).reshape((epochs, len(self.nodes)))
+
+        B = SIMULATION_PARAMETERS['CHANNEL_BANDWITH']
+        sigma_0 = SIMULATION_PARAMETERS['BACKGROUND_NOISE']
+        datarates: np.ndarray = B * log2(1 + (channel_powers / (total_channel_powers + sigma_0 - active_channel_powers)))
+
+        avg_datarates = np.average(datarates, axis=0)
+
+        total_cost = 0
+        for i, node in enumerate(self.nodes):
+            if node._choice_index == 0:
+                total_cost += node.active_probability * node.local_cost()
+            else:
+                total_cost += node.active_probability * node.cloud_cost(avg_datarates[i])
+        return total_cost
+        
 
     def plot(self):
         # System-wide cost

@@ -36,11 +36,16 @@ class Node(EnvironmentEntity):
     async def main_loop(self):
         raise NotImplemented
 
-class Transmission(envs.Task):
-    def __init__(self, from_node: Node, to_node: Node, duration: Number) -> None:
-        super().__init__(coro=envs.sleep(duration), wait_until=None, callbacks=[])
+class Transmission(EnvironmentEntity):
+    def __init__(self, from_node: Node, to_node: Node, channel: 'Channel') -> None:
         self.from_node = from_node
         self.to_node = to_node
+        self.channel = channel
+        self.finished = None
+        self.started = None
+    
+    def disconnect(self):
+        return self.channel.disconnect(self)
 
 class Channel(EnvironmentEntity):
     def __init__(self) -> None:
@@ -48,6 +53,17 @@ class Channel(EnvironmentEntity):
 
     def datarate_between(self, from_node: Node, to_node: Node) -> Number:
         raise NotImplemented
+
+    def connect(self, from_node: Node, to_node: Node) -> Transmission:
+        transmission = Transmission(from_node, to_node, channel=self)
+        transmission.finished = False
+        transmission.started = True
+        self.transmission_list.append(transmission)
+        return transmission
+
+    def disconnect(self, transmission: Transmission):
+        transmission.finished = True
+        self.transmission_list.pop(self.transmission_list.index(transmission))
     
     async def transfer_data(self, from_node: Node, to_node: Node, duration: Number = None, datasize: Number = None):
         """[Coroutine] Transfer data bwteen nodes.
@@ -98,6 +114,7 @@ class Profile:
 
     async def async_sample(self):
         while True:
+            await envs.wait_for_simul_tasks()
             self.sample()
             await envs.sleep(self.sample_interval)
 
