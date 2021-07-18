@@ -441,13 +441,26 @@ class MASLProfile(Profile):
 
         active_channel_powers = channel_powers * activeness_v
         
-        total_channel_powers: np.ndarray = np.sum(active_channel_powers, axis=1)
-        assert total_channel_powers.shape == (epochs,)
-        total_channel_powers = total_channel_powers.repeat(len(self.nodes)).reshape((epochs, len(self.nodes)))
+        channels = self.nodes[0].channels
+        channel_nodes = np.zeros((len(channels), len(self.nodes)), dtype='bool')
+        for j, node in enumerate(self.nodes):
+            i = node._choice_index - 1
+            if i >= 0:
+                channel_nodes[i][j] = True
+
+        total_channel_powers = np.empty((epochs, len(channels)))
+        for i, nodes_bool in enumerate(channel_nodes):
+            total_channel_powers[:, i] = np.sum(active_channel_powers, axis=1, where=nodes_bool)
+
+        total_channel_powers_for_nodes = np.zeros_like(channel_powers)
+        for i, node in enumerate(self.nodes):
+            j = node._choice_index - 1
+            if j >= 0:
+                total_channel_powers_for_nodes[np.arange(epochs), i] = total_channel_powers[:, j]
 
         B = SIMULATION_PARAMETERS['CHANNEL_BANDWITH']
         sigma_0 = SIMULATION_PARAMETERS['BACKGROUND_NOISE']
-        datarates: np.ndarray = B * log2(1 + (channel_powers / (total_channel_powers + sigma_0 - active_channel_powers)))
+        datarates: np.ndarray = B * log2(1 + (channel_powers / (total_channel_powers_for_nodes + sigma_0 - active_channel_powers)))
 
         avg_datarates = np.average(datarates, axis=0)
 
