@@ -4,3 +4,6 @@ __pycache__/
 playground.ipynb
 docs/
 result.txt
+.vscode/
+*.json
+*.log
