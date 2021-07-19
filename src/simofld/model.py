@@ -112,7 +112,7 @@ class Profile:
     def __init__(self, sample_interval: Number) -> None:
         self.sample_interval = sample_interval
 
-    async def async_sample(self):
+    async def main_loop(self):
         while True:
             await envs.wait_for_simul_tasks()
             self.sample()
@@ -126,6 +126,6 @@ class SimulationEnvironment(Environment):
         coros = [node.main_loop() for node in nodes]
         p_list = [0 for _ in nodes]
         if profile:
-            coros += [profile.async_sample()]
+            coros += [profile.main_loop()]
             p_list += [1]
         super().__init__(coros, priority_list=p_list, initial_time=0, until=until)
