@@ -13,7 +13,7 @@ import numpy as np
 from numpy import e, log2, random
 
 from . import envs
-from .model import LocalData, Node, Channel, Profile, SimulationEnvironment
+from .model import LocalData, Node, Channel, Profile, SimulationEnvironment, Transmission
 
 SIMULATION_PARAMETERS = {
     # CHART
@@ -45,7 +45,6 @@ logger = getLogger(__name__)
 
 approx_betas = np.linspace(0.5, 5, 10)
 def _generate_exponential(size: Number):
-    return 1 if size <= 1 else [1 for _ in range(size)]
     def _map(v: Number):
         if v > 5:
             return 5
@@ -65,8 +64,8 @@ def _generate_rayleigh_factor(mobile, getnow):
 class MobileUser(Node):
     def __init__(self, channels: List[Channel]) -> None:
         super().__init__()
-        self._x = 10 + (1 - random.random()) * SIMULATION_PARAMETERS['AP_COVERAGE'] # Distance to the AP
-        # self._x = 10
+        self._x = 5 + (1 - random.random()) * SIMULATION_PARAMETERS['AP_COVERAGE'] # Distance to the AP
+        # self._x = 5
         self._w = None
         self._choice_index = None
         self._w_history = []
@@ -250,18 +249,19 @@ class MobileUser(Node):
                 logger.debug('='*20 + '\n'*2)
                 if r < 0:
                     logger.warning(f'Genrating r < 0: {r}, gamma: {gamma}, lr: {lr}, choice: {choice_index}, payoff: {payoff}, beta: {_generate_rayleigh_factor(self.id, envs.get_current_env().now)} now: {envs.get_current_env().now}')
-                    # r = 0
+                    r = 0
                 elif r > 1:
                     logger.warning(f'Genrating r > 1: {r}, gamma: {gamma}, lr: {lr}, choice: {choice_index}, payoff: {payoff}, beta: {_generate_rayleigh_factor(self.id, envs.get_current_env().now)}')
-                    # r = 1
+                    r = 1
                 new_w = w + lr * r * (e - w)
 
                 scale_factor = 0.99
                 while any(i < 0 for i in new_w):
                     new_w = w + scale_factor * lr * r * (e - w)
                     scale_factor = scale_factor**2
-                    logger.warning(f'Genrating w < 0: {new_w}, choice: {choice_index}, payoff: {payoff}, beta: {_generate_rayleigh_factor(self.id, envs.get_current_env().now)}')
+                    logger.warning(f'Genrating w < 0: {new_w}, {w}, choice: {choice_index}, payoff: {payoff}, beta: {_generate_rayleigh_factor(self.id, envs.get_current_env().now)}')
 
+                new_w = new_w / np.sum(new_w)
                 self._w = w = new_w
                 self._w_history.append(w)
 
@@ -351,7 +351,7 @@ class MASLProfile(Profile):
 
         # Prepare vectors for system-wide cost calculation
         alpha = SIMULATION_PARAMETERS['PATH_LOSS_EXPONENT']
-        self.channel_powers_0 = np.array([20**(-alpha) * node.transmit_power for node in nodes]) # channel powers divied by respective rayleigh fading factors
+        self.channel_powers_0 = np.array([node._x**(-alpha) * node.transmit_power for node in nodes]) # channel powers divied by respective rayleigh fading factors
 
         self._system_wide_cost_samples = []
         self._node_choices = [[] for _ in nodes]
