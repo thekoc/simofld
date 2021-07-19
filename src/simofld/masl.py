@@ -428,50 +428,59 @@ class MASLProfile(Profile):
         return total_cost
     
     def system_wide_cost_vectorized(self):
-        epochs = 10000
+        epochs = 5000
 
         betas: np.ndarray = random.standard_exponential((epochs, len(self.nodes)))
         betas = np.ceil(betas * 2) / 2
+        # betas = np.ones_like(betas)
 
         active_probabilities = np.array([node.active_probability for node in self.nodes])
         activeness_v: np.ndarray = random.random((epochs, len(self.nodes))) < active_probabilities
 
         channel_powers: np.ndarray = self.channel_powers_0 * betas
         assert channel_powers.shape == (epochs, len(self.nodes))
-
+        pass
         active_channel_powers = channel_powers * activeness_v
-        
+
         channels = self.nodes[0].channels
-        channel_nodes = np.zeros((len(channels), len(self.nodes)), dtype='bool')
-        for j, node in enumerate(self.nodes):
-            i = node._choice_index - 1
-            if i >= 0:
-                channel_nodes[i][j] = True
 
-        total_channel_powers = np.empty((epochs, len(channels)))
-        for i, nodes_bool in enumerate(channel_nodes):
-            total_channel_powers[:, i] = np.sum(active_channel_powers, axis=1, where=nodes_bool)
-
-        total_channel_powers_for_nodes = np.zeros_like(channel_powers)
+        user_choices = np.empty((epochs, len(self.nodes)), dtype='int')
+        # 0 means loal computation
         for i, node in enumerate(self.nodes):
-            j = node._choice_index - 1
-            if j >= 0:
-                total_channel_powers_for_nodes[np.arange(epochs), i] = total_channel_powers[:, j]
+            w = np.array(node._w)
+            choices = random.choice(np.arange(len(channels) + 1), epochs, p=w)
+            if np.sum(choices > 0) < epochs * 0.05:
+                choices = 0
+            user_choices[:, i] = choices
+        
+        # column 0 means local computation (always equals to 0)
+        total_channel_powers_by_channel = np.zeros((epochs, len(channels) + 1))
+        for i in range(1, 1 + len(channels)):
+            total_channel_powers_by_channel[:, i] = np.sum(active_channel_powers, axis=1, where=user_choices==i)
 
+        total_channel_powers_by_user = np.empty((epochs, len(self.nodes)))
+        for i in range(len(self.nodes)):
+            total_channel_powers_by_user[:, i] = total_channel_powers_by_channel[np.arange(epochs), user_choices[:, i]]
+        
         B = SIMULATION_PARAMETERS['CHANNEL_BANDWITH']
         sigma_0 = SIMULATION_PARAMETERS['BACKGROUND_NOISE']
-        datarates: np.ndarray = B * log2(1 + (channel_powers / (total_channel_powers_for_nodes + sigma_0 - active_channel_powers)))
+        temp = 1 + (channel_powers / (total_channel_powers_by_user + sigma_0 - active_channel_powers))
+        pass
+        pass
+        # assert  np.all((channel_powers / (total_channel_powers_by_user + sigma_0 - active_channel_powers)) > 0)
+        datarates: np.ndarray = B * log2(temp)
 
-        avg_datarates = np.average(datarates, axis=0)
+        avg_datarates = np.mean(datarates, axis=0, where=user_choices!=0)
 
         total_cost = 0
         for i, node in enumerate(self.nodes):
-            if node._choice_index == 0:
-                total_cost += node.active_probability * node.local_cost()
+            if np.isnan(avg_datarates[i]):
+                cloud_cost = 0
             else:
-                total_cost += node.active_probability * node.cloud_cost(avg_datarates[i])
+                cloud_cost = node.cloud_cost(avg_datarates[i])
+            
+            total_cost += node._w[0] * node.local_cost() + sum(node._w[1:]) * cloud_cost
         return total_cost
-        
 
     def plot(self):
         # System-wide cost
