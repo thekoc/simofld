@@ -300,22 +300,12 @@ class RayleighChannel(Channel):
     """A channel that follows Rayleigh fading. Notice that the datarate will also be affected by connected user. 
     """
     bandwidth: Number = SIMULATION_PARAMETERS['CHANNEL_BANDWITH']
-    generate_random_var_locally = False
-    _p_beta = 0
-    _beta_cache = _generate_exponential(10000)
     def __init__(self) -> None:
         super().__init__()
 
     @classmethod
     def _get_rayleigh_factor(cls, mobile_id, now):
-        if cls.generate_random_var_locally:
-            beta = cls._beta_cache[cls._p_beta]
-            cls._p_beta += 1
-            if cls._p_beta >= len(cls._beta_cache):
-                cls._p_beta = 0
-                cls._beta_cache = _generate_exponential(10000)
-        else:
-            beta = _generate_rayleigh_factor(mobile_id, now)
+        beta = _generate_rayleigh_factor(mobile_id, now)
         return beta
     
     @classmethod
@@ -418,48 +408,8 @@ class MASLProfile(Profile):
         for i, node in enumerate(nodes):
             self._node_choices[i].append(node._choice_index)
         result = self.system_wide_cost_vectorized()
-        # result = self.system_wide_cost()
         logger.debug(f'cost: {result}')
         self._system_wide_cost_samples.append(result)
-
-    def system_wide_cost(self):
-        nodes = self.nodes
-        cloud_server = envs.get_current_env().g.cloud_server
-        total_cost = 0
-        epochs = 10000
-
-        datarates = {node.id: [] for node in nodes}
-        
-        
-        active_list = [node.active for node in nodes]
-        RayleighChannel.generate_random_var_locally = True
-
-        for _ in range(epochs):
-            for node in nodes:
-                node.active = (random.random() < node.active_probability)
-            for node in nodes:
-                if node._choice_index > 0:
-                    channel = node.channels[node._choice_index - 1]
-                    datarates[node.id].append(channel.datarate_between(node, cloud_server))
-
-        avg_datarates = {}
-        for node in nodes:
-            if len(datarates[node.id]):
-                avg_datarates[node.id] = sum(datarates[node.id]) / len(datarates[node.id])
-            else:
-                avg_datarates[node.id] = None
-
-        RayleighChannel.generate_random_var_locally = False
-
-        for node, active in zip(nodes, active_list):
-            node.active = active
-        
-        for node in nodes:
-            if node._choice_index == 0:
-                total_cost += node.active_probability * node.local_cost()
-            else:
-                total_cost += node.active_probability * node.cloud_cost(avg_datarates[node.id])
-        return total_cost
     
     def system_wide_cost_vectorized(self) -> Number:
         """The system wide cost (vectorized version)
