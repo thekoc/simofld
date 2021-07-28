@@ -50,6 +50,7 @@ class Task(EnvironmentEntity):
         """
         self.coro = coro # type: Coroutine
         self.lifespan = None
+        self.value = None
         self.priority = priority
         self._done = False
         self._started = False
@@ -190,12 +191,12 @@ async def sleep(delay, env: 'Environment' = None):
 
     return await env.create_task(None, delay)
 
-async def wait_for_simul_tasks(env: 'Environment' = None):
+async def wait_for_simul_tasks(priority=TASK_PRIORITY_MAX_NUMBER, env: 'Environment' = None):
     """Wait for other tasks that are scheduled for the same time.
     """
     if env is None:
         env = get_current_env()
-    return await env.create_task(coro=None, delay=0, priority=TASK_PRIORITY_MAX_NUMBER)
+    return await env.create_task(coro=None, delay=0, priority=priority)
 
 
 async def gather(coros, env: 'Environment' = None):
