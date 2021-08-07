@@ -16,37 +16,36 @@ from .model import Node, Channel, Profile, SimulationEnvironment, Transmission
 
 SIMULATION_PARAMETERS = {
     # CHART
-    'AP_COVERAGE': 45, # meter
-    'MOBILE_NUM': 20,
-    'MOBILE_ACTIVE_PROBABILITY': 0.9,
+    'AP_COVERAGE': 40, # meter
+
     'CHANNEL_NUM': 10,
-    'CHANNEL_BANDWITH': 500 * 10**6, # MHz
-    'TRANSMIT_POWER': 100 * 10**-3, # mW
+    'CHANNEL_BANDWITH': 5e6, # MHz
+    'TRANSMIT_POWER': 100e-3, # mW
     'PATH_LOSS_EXPONENT': 4,
-    'BACKGROUND_NOISE': 10**-13 , # dBm
-    'DATA_SIZE': 5000 * 10**6 * 8, # KB
-    'LOCAL_CPU_CYCLES': 1000 * 10**7, # Megacycles
-    'CLOUD_CPU_CYCLES': 1200 * 10**6, # Megacycles
-    'LOCAL_CPU_CAPABILITY': (0.5 * 10**9, 0.8 * 10**9, 1.0 * 10**9), # GHz,
-    'CLOUD_CPU_CAPABILITY': 12 * 10**9, # GHz,
+    'BACKGROUND_NOISE': 1e-13 , # dBm
+    'DATA_SIZE': 8*5000e3, # KB
+    'LOCAL_CPU_CYCLES': 1000e6, # Megacycles
+    'CLOUD_CPU_CYCLES': 1200e6, # Megacycles
+    'LOCAL_CPU_CAPABILITY': (0.5e9, 0.8e9, 1.0e9), # GHz,
+    'CLOUD_CPU_CAPABILITY': 12e9, # GHz,
     'COMPUTATIONAL_ENERGY_WEIGHT': (0, 0.5, 1.0),
     'COMPUTATIONAL_TIME_WEIGHT': None,
-    'COMPUTING_ENERGY_EFFECIENCY': (400 * 10**6, 500 * 10**6, 600 * 10**6), # Megacycles/J
+    'COMPUTING_ENERGY_EFFECIENCY': (400e6, 500e6, 600e6), # Megacycles/J
     
     # MOBILE
     'LEARNING_RATE': 0.1,
     
     # Channel
-    'CHANNEL_SCALING_FACTOR': 10**4,
+    'CHANNEL_SCALING_FACTOR': 2e6,
 }
 
 logger = getLogger(__name__)
 
-approx_betas = np.linspace(0.5, 5, 10)
+approx_betas = np.linspace(0.5, 5, 20)
 def _generate_exponential(size: Number):
     def _map(v: Number):
         if v > 5:
-            return 5
+            return v
         for n in approx_betas:
             if v <= n:
                 return n
@@ -61,10 +60,10 @@ def _generate_rayleigh_factor(mobile, getnow):
     return beta
 
 class MobileUser(Node):
-    def __init__(self, channels: List[Channel]) -> None:
+    def __init__(self, channels: List[Channel], distance=None, active_probability=None) -> None:
         super().__init__()
         # distance to AP
-        self._x = 5 + (1 - random.random()) * SIMULATION_PARAMETERS['AP_COVERAGE'] # Distance to the AP
+        self._x = 10 + (1 - random.random()) * SIMULATION_PARAMETERS['AP_COVERAGE'] if distance is None else distance
         # self._x = 5
 
         # Probability for chosing different channels (0 means local computation).
@@ -74,7 +73,7 @@ class MobileUser(Node):
 
         self._choice_index = None
         self.lr = SIMULATION_PARAMETERS['LEARNING_RATE']
-        self.active_probability = 1 - random.random()
+        self.active_probability = 1 - random.random() if active_probability is None else active_probability
         # self.active_probability = 1
         self.channels = channels
         self.transmit_power = SIMULATION_PARAMETERS['TRANSMIT_POWER'] # p_i
@@ -84,8 +83,8 @@ class MobileUser(Node):
         self.cpu_effeciency = SIMULATION_PARAMETERS['COMPUTING_ENERGY_EFFECIENCY'][0] # Megacycles/J TODO: Random selection
         
         # The weights to calculate payoff function
-        self._payoff_weight_energy = 0.5
-        self._payoff_weight_time = 0.5
+        self._payoff_weight_energy = 0
+        self._payoff_weight_time = 1 - self._payoff_weight_energy
 
         self._datasize = SIMULATION_PARAMETERS['DATA_SIZE']
 
@@ -163,7 +162,7 @@ class MobileUser(Node):
         D_loc = SIMULATION_PARAMETERS['LOCAL_CPU_CYCLES']
         F_loc = self.cpu_frequency
         T_loc = D_loc / F_loc
-        E_loc = T_loc / self.cpu_effeciency
+        E_loc = D_loc / self.cpu_effeciency
         return mu_T * T_loc + mu_E * E_loc
     
     def generate_choice_index(self) -> Number:
@@ -333,7 +332,7 @@ class RayleighChannel(Channel):
         tot_power = 0
         for transmission in self.transmission_list:
             node = transmission.from_node
-            assert isinstance(node, MobileUser)
+            assert isinstance(node, Node)
             if node.active and (exclude.id != node.id):
                 tot_power += self.channel_power(node)
                 
@@ -411,7 +410,7 @@ class MASLProfile(Profile):
         self._system_wide_cost_samples.append(result)
     
     def system_wide_cost_vectorized(self):
-        epochs = 50000
+        epochs = 1000
         betas: np.ndarray = random.standard_exponential((epochs, len(self.nodes)))
         betas = np.ceil(betas * 2) / 2
         # betas = np.ones_like(betas)
@@ -443,13 +442,64 @@ class MASLProfile(Profile):
         datarates: np.ndarray = B * log2(temp)
         avg_datarates = np.mean(datarates, axis=0, where=user_choices!=0)
         total_cost = 0
+        print(f'avgdr: , now: {envs.get_current_env().now}')
         for i, node in enumerate(self.nodes):
             if np.isnan(avg_datarates[i]):
                 cloud_cost = 0
             else:
                 cloud_cost = node.cloud_cost(avg_datarates[i])
             
-            total_cost += node._w[0] * node.local_cost() + sum(node._w[1:]) * cloud_cost
+            total_cost += (node._w[0] * node.local_cost() + sum(node._w[1:]) * cloud_cost) * node.active_probability
+        return total_cost
+
+    def system_wide_cost_vectorized_static_choice(self) -> Number:
+        """The system wide cost (vectorized version)
+
+        Returns:
+            Number: System wide cost.
+        """
+        epochs = 10000
+
+        betas: np.ndarray = random.standard_exponential((epochs, len(self.nodes)))
+        betas = np.ceil(betas * 2) / 2
+
+        active_probabilities = np.array([node.active_probability for node in self.nodes])
+        activeness_v: np.ndarray = random.random((epochs, len(self.nodes))) < active_probabilities
+
+        channel_powers: np.ndarray = self.channel_powers_0 * betas
+        assert channel_powers.shape == (epochs, len(self.nodes))
+
+        active_channel_powers = channel_powers * activeness_v
+        
+        channels = self.nodes[0].channels
+        channel_nodes = np.zeros((len(channels), len(self.nodes)), dtype='bool')
+        for j, node in enumerate(self.nodes):
+            i = node._choice_index - 1
+            if i >= 0:
+                channel_nodes[i][j] = True
+
+        total_channel_powers = np.empty((epochs, len(channels)))
+        for i, nodes_bool in enumerate(channel_nodes):
+            total_channel_powers[:, i] = np.sum(active_channel_powers, axis=1, where=nodes_bool)
+
+        total_channel_powers_for_nodes = np.zeros_like(channel_powers)
+        for i, node in enumerate(self.nodes):
+            j = node._choice_index - 1
+            if j >= 0:
+                total_channel_powers_for_nodes[:, i] = total_channel_powers[:, j]
+
+        B = SIMULATION_PARAMETERS['CHANNEL_BANDWITH']
+        sigma_0 = SIMULATION_PARAMETERS['BACKGROUND_NOISE']
+        datarates: np.ndarray = B * log2(1 + (channel_powers / (total_channel_powers_for_nodes + sigma_0 - active_channel_powers)))
+
+        avg_datarates = np.average(datarates, axis=0)
+
+        total_cost = 0
+        for i, node in enumerate(self.nodes):
+            if node._choice_index == 0:
+                total_cost += node.active_probability * node.local_cost()
+            else:
+                total_cost += node.active_probability * node.cloud_cost(avg_datarates[i])
         return total_cost
 
 def create_env(users: List[MobileUser], cloud_server: CloudServer, profile: Optional[MASLProfile], until: Number, step_interval: Number):
