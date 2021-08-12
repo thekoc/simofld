@@ -174,9 +174,10 @@ class MobileUser(Node):
         choice_index = random.choice(len(self.channels) + 1, 1, p=self._w).item() 
         return choice_index
 
-    async def perform_cloud_computation(self, cloud_server: 'CloudServer', channel: Channel, upload_duration: Number, datarate: Number):
+    async def perform_cloud_computation(self, cloud_server: 'CloudServer', channel: Channel, upload_duration: Number):
         env = self.get_current_env()
         await envs.sleep(upload_duration)
+        datarate = channel.datarate_between(self, cloud_server)
         transmission_datasize = datarate * upload_duration
 
         # TODO: Make this more readable
@@ -211,49 +212,36 @@ class MobileUser(Node):
         last_transmission: Transmission = None
 
         while True:
+            self._w_history.append(w)
             self.active = True if random.random() < theta else False
             choice_index = self.generate_choice_index()
             self._choice_index = choice_index
+
+            if last_transmission:
+                last_transmission.disconnect()
+                last_transmission = None
+
             if self.active:
                 if choice_index == 0: # local computation
-                    logger.debug(f'Calculating Q for user {self.id}')
                     ongoing_trans = None
-                    payoff = self._Q()
-
-                    # Wait for other users to calculate their payoffs then disconnect
-                    await envs.wait_for_simul_tasks()
-
-                    if last_transmission:
-                        last_transmission.disconnect()
-                        last_transmission = None
-
                     await self.perform_local_computation(step_interval)
-                    logger.debug(f'Q: {payoff}')
+                    payoff = self._Q()
+                    await envs.wait_for_simul_tasks()
                     
                 else: # cloud execution
                     channel: Channel = choice_list[choice_index]
-                    ongoing_trans = [t.from_node.id for t in channel.transmission_list]
-
-                    payoff = self._I(channel)
-                    dr = channel.datarate_between(self, cloud_server)
-                    logger.debug(f'Calculating I for user {self.id}, result:{payoff},  channel: {channel.id} list: {ongoing_trans}')
-
-                    # Wait for other users to calculate their payoffs then disconnect
-                    await envs.wait_for_simul_tasks()
-                    if last_transmission:
-                        last_transmission.disconnect()
-                        last_transmission = None
-
                     last_transmission = channel.connect(self, cloud_server)
-                    await self.perform_cloud_computation(cloud_server, channel, step_interval, dr)
-                    logger.debug(f'I: {payoff}')
+                    await self.perform_cloud_computation(cloud_server, channel, step_interval)
+                    ongoing_trans = [t.from_node.id for t in channel.transmission_list]
+                    payoff = self._I(channel)
+                    await envs.wait_for_simul_tasks()
 
                 # `e` is the unit vector
                 e = np.zeros(channel_num + 1)
                 e[choice_index] = 1
 
                 logger.debug('='*20)
-                logger.debug(f'User {self.id}, x: {self._x} chooses channel {choice_index}, now: {envs.get_current_env().now}')
+                logger.debug(f'User {self.id}, x: {self._x:.1f} chooses channel {choice_index}, now: {envs.get_current_env().now}')
                 logger.debug(f'onging trans {ongoing_trans}')
 
                 logger.debug(w)
@@ -263,11 +251,11 @@ class MobileUser(Node):
                 logger.debug('='*20 + '\n'*2)
                 if r < 0:
                     # Set the lower bound of 0
-                    logger.warning(f'Genrating r < 0: {r}, gamma: {gamma}, lr: {lr}, choice: {choice_index}, payoff: {payoff}, beta: {_generate_rayleigh_factor(self.id, envs.get_current_env().now)} now: {envs.get_current_env().now}')
+                    logger.warning(f'Genrating r < 0: {r}, gamma: {gamma}, lr: {lr}, choice: {choice_index}, payoff: {payoff}, beta: {_generate_rayleigh_factor(self.id, envs.get_current_env().now)} now: {envs.get_current_env().now} distance: {self._x}')
                     r = 0
                 elif r > 1:
                     # Set the lower bound of 1
-                    logger.warning(f'Genrating r > 1: {r}, gamma: {gamma}, lr: {lr}, choice: {choice_index}, payoff: {payoff}, beta: {_generate_rayleigh_factor(self.id, envs.get_current_env().now)}')
+                    logger.warning(f'Genrating r > 1: {r}, gamma: {gamma}, lr: {lr}, choice: {choice_index}, payoff: {payoff}, beta: {_generate_rayleigh_factor(self.id, envs.get_current_env().now)} distance: {self._x}')
                     r = 1
                 new_w = w + lr * r * (e - w)
                 
@@ -281,17 +269,13 @@ class MobileUser(Node):
                 # To make sure sum(w) equals 1 (Becauses of float number errors it is not always true)
                 new_w = new_w / np.sum(new_w)
                 self._w = w = new_w
-                self._w_history.append(w)
+                
 
                 # assert r > 0
             else:
                 # If not active, just sleep
-                await envs.wait_for_simul_tasks()
-                if last_transmission:
-                    last_transmission.disconnect()
-                    last_transmission = None
-
                 await envs.sleep(step_interval)
+                await envs.wait_for_simul_tasks()
 
 
 class RayleighChannel(Channel):
