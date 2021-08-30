@@ -37,6 +37,8 @@ SIMULATION_PARAMETERS = {
     
     # Channel
     'CHANNEL_SCALING_FACTOR': 1e5,
+
+    'CONSTANT_BETAS': True,
 }
 
 logger = getLogger(__name__)
@@ -44,7 +46,10 @@ logger = getLogger(__name__)
 approx_betas = np.linspace(0.5, 5, 20)
 def _generate_exponential(size: Number):
     def _map(v: Number):
-        return v
+        if SIMULATION_PARAMETERS['CONSTANT_BETAS']:
+            return 1
+        else:
+            return v
         if v > 5:
             return v
         for n in approx_betas:
@@ -462,9 +467,11 @@ class MASLProfile(Profile):
             Number: System wide cost.
         """
         epochs = 1000
-
-        betas: np.ndarray = random.standard_exponential((epochs, len(self.nodes)))
-        betas = np.ceil(betas * 2) / 2
+        if SIMULATION_PARAMETERS['CONSTANT_BETAS']:
+            betas = np.ones((epochs, len(self.nodes)))
+        else:
+            betas: np.ndarray = random.standard_exponential((epochs, len(self.nodes)))
+            betas = np.ceil(betas * 2) / 2
 
         active_probabilities = np.array([node.active_probability for node in self.nodes])
         activeness_v: np.ndarray = random.random((epochs, len(self.nodes))) < active_probabilities

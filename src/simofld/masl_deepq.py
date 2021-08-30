@@ -22,12 +22,12 @@ class DQNAgent:
         self.state_size = state_size
         self.action_size = action_size
         self.memory = deque(maxlen=2000)
-        self.gamma = 0.5    # discount rate
-        self.alpha = 0.7
+        self.gamma = 0.1    # discount rate
+        self.alpha = 0.8
         self.epsilon = 1.0  # exploration rate
         self.epsilon_min = 0.01
-        self.epsilon_decay = 0.995
-        self.learning_rate = 0.1
+        self.epsilon_decay = 0.98
+        self.learning_rate = 0.01
         self.model = self._build_model()
         self.target_model = self._build_model()
 
@@ -57,7 +57,7 @@ class DQNAgent:
         current_q_list = self.model.predict(current_states)
         
         next_states = [e[3] for e in minibatch]
-        future_max_q_list = np.max(self.model.predict(next_states), axis=1)
+        future_max_q_list = np.max(self.target_model.predict(next_states), axis=1)
         
         X = []
         Y = []
@@ -74,11 +74,15 @@ class DQNAgent:
             X.append(state)
             Y.append(current_q)
 
-        self.model.fit(np.array(X), np.array(Y), batch_size=batch_size, verbose=0, shuffle=True)
+        self.model.fit(np.array(X), np.array(Y), batch_size=batch_size, verbose=0, shuffle=True)            
+
         print(f'epsilon: {self.epsilon}')
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
+    def copy_weights_to_target(self):
+        self.target_model.set_weights(self.model.get_weights())
+    
     def load(self, name):
         self.model.load_weights(name)
 
@@ -119,21 +123,20 @@ class MobileUser(MASLMobileUser):
 
     async def main_loop(self):
         last_state = None
-        batch_size = 32
+        batch_size = 64
 
         last_transmission: Optional[Transmission] = None
         cloud_server = self._get_cloud_server()
         step_interval = self.get_current_env().g.step_interval
         self._choice_index = random.randint(0, len(self.channels) + 1)
-        epoch = 0
+        update_count = 0
         while True:
             self.active = True if random.random() < self.active_probability else False
             if last_transmission:
                 last_transmission.disconnect()
                 last_transmission = None
-
             if self.active:
-                epoch += 1
+                update_count += 1
                 if self._choice_index == 0:
                     await self.perform_local_computation(step_interval)
                 else:
@@ -153,8 +156,11 @@ class MobileUser(MASLMobileUser):
                 
                 
                 if len(self.dqn_agent.memory) > batch_size:
-                    if epoch % 4 == 0:
+                    if update_count % 4 == 0:
                         self.dqn_agent.replay(batch_size)
+                    if update_count > 50:
+                        self.dqn_agent.copy_weights_to_target()
+                        update_count = 0
 
 class CloudServer(masl.CloudServer):
     pass
