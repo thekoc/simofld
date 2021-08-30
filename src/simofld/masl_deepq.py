@@ -7,6 +7,7 @@ from collections import deque
 import numpy as np
 from numpy import log2, random
 from tensorflow import keras
+import tensorflow as tf
 
 from . import envs
 from .model import Node, Channel, SimulationEnvironment, Transmission
@@ -21,21 +22,23 @@ class DQNAgent:
         self.state_size = state_size
         self.action_size = action_size
         self.memory = deque(maxlen=2000)
-        self.gamma = 0.95    # discount rate
+        self.gamma = 0.5    # discount rate
+        self.alpha = 0.7
         self.epsilon = 1.0  # exploration rate
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.995
-        self.learning_rate = 0.001
+        self.learning_rate = 0.1
         self.model = self._build_model()
+        self.target_model = self._build_model()
 
     def _build_model(self):
         # Neural Net for Deep-Q learning Model
-        model = keras.models.Sequential()
-        model.add(keras.layers.Dense(24, input_dim=self.state_size, activation='relu'))
-        model.add(keras.layers.Dense(24, activation='relu'))
-        model.add(keras.layers.Dense(self.action_size, activation='linear'))
-        model.compile(loss='mse',
-                      optimizer=keras.optimizers.Adam(lr=self.learning_rate))
+        init = tf.keras.initializers.he_uniform()
+        model = keras.Sequential()
+        model.add(keras.layers.Dense(24, input_dim=self.state_size, activation='relu', kernel_initializer=init))
+        model.add(keras.layers.Dense(12, activation='relu', kernel_initializer=init))
+        model.add(keras.layers.Dense(self.action_size, activation='linear', kernel_initializer=init))
+        model.compile(loss=tf.keras.losses.Huber(), optimizer=tf.keras.optimizers.Adam(lr=self.learning_rate), metrics=['accuracy'])
         return model
 
     def memorize(self, state, action, reward, next_state, done):
@@ -49,14 +52,30 @@ class DQNAgent:
 
     def replay(self, batch_size):
         minibatch = py_random.sample(self.memory, batch_size)
-        for state, action, reward, next_state, done in minibatch:
-            target = reward
+
+        current_states = np.array([e[0] for e in minibatch])
+        current_q_list = self.model.predict(current_states)
+        
+        next_states = [e[3] for e in minibatch]
+        future_max_q_list = np.max(self.model.predict(next_states), axis=1)
+        
+        X = []
+        Y = []
+
+        for i, (state, action, reward, next_state, done) in enumerate(minibatch):
+            future_max_q = future_max_q_list[i]
+            current_q = current_q_list[i]
             if not done:
                 target = (reward + self.gamma *
-                          np.amax(self.model.predict(next_state)[0]))
-            target_f = self.model.predict(state)
-            target_f[0][action] = target
-            self.model.fit(state, target_f, epochs=1, verbose=0)
+                          future_max_q)
+            else:
+                target = reward
+            current_q[action] = (1 - self.alpha) * current_q[action] + self.alpha * target
+            X.append(state)
+            Y.append(current_q)
+
+        self.model.fit(np.array(X), np.array(Y), batch_size=batch_size, verbose=0, shuffle=True)
+        print(f'epsilon: {self.epsilon}')
         if self.epsilon > self.epsilon_min:
             self.epsilon *= self.epsilon_decay
 
@@ -96,7 +115,7 @@ class MobileUser(MASLMobileUser):
 
     def get_state(self):
         state = [self._Q()] + [self._I(channel) for channel in self.channels]
-        return np.array(state).reshape((1, len(state)))
+        return state
 
     async def main_loop(self):
         last_state = None
@@ -106,6 +125,7 @@ class MobileUser(MASLMobileUser):
         cloud_server = self._get_cloud_server()
         step_interval = self.get_current_env().g.step_interval
         self._choice_index = random.randint(0, len(self.channels) + 1)
+        epoch = 0
         while True:
             self.active = True if random.random() < self.active_probability else False
             if last_transmission:
@@ -113,6 +133,7 @@ class MobileUser(MASLMobileUser):
                 last_transmission = None
 
             if self.active:
+                epoch += 1
                 if self._choice_index == 0:
                     await self.perform_local_computation(step_interval)
                 else:
@@ -130,7 +151,8 @@ class MobileUser(MASLMobileUser):
                 last_state = state
                 
                 if len(self.dqn_agent.memory) > batch_size:
-                    self.dqn_agent.replay(batch_size)
+                    if epoch % 4 == 0:
+                        self.dqn_agent.replay(batch_size)
 
 class CloudServer(masl.CloudServer):
     pass

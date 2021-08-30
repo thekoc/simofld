@@ -286,13 +286,13 @@ def run_dq_wrapper(p_dict: dict):
 def test_dq():
     parameters = [
         {
-            'group': 'gamma', 'gamma': 1e5, 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 100, 'profile_sample_interval': 1
+            'group': 'gamma', 'gamma': 1e5, 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 1000, 'profile_sample_interval': 10
         }
     ]
 
     
     # with Pool(os.cpu_count()) as pool:
-    #     results = pool.map(run_dq_wrapper, parameters * 2)
+    #     results = pool.map(run_dq_wrapper, parameters * 10)
     results = [run_dq_wrapper(parameters[0])]
     samples_na = np.array([result['system_cost_histogram'] for result in results])
     system_cost_histogram = list(samples_na.mean(axis=0))
