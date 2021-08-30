@@ -286,7 +286,7 @@ def run_dq_wrapper(p_dict: dict):
 def test_dq():
     parameters = [
         {
-            'group': 'gamma', 'gamma': 1e5, 'lr': 0.1, 'user_num': 3, 'channel_num': 3, 'until': 800, 'profile_sample_interval': 1
+            'group': 'gamma', 'gamma': 1e5, 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 700, 'profile_sample_interval': 1
         }
     ]
 

@@ -38,7 +38,7 @@ SIMULATION_PARAMETERS = {
     # Channel
     'CHANNEL_SCALING_FACTOR': 1e5,
 
-    'CONSTANT_BETAS': True,
+    'CONSTANT_BETAS': False,
 }
 
 logger = getLogger(__name__)
@@ -471,7 +471,7 @@ class MASLProfile(Profile):
             betas = np.ones((epochs, len(self.nodes)))
         else:
             betas: np.ndarray = random.standard_exponential((epochs, len(self.nodes)))
-            betas = np.ceil(betas * 2) / 2
+            # betas = np.ceil(betas * 2) / 2
 
         active_probabilities = np.array([node.active_probability for node in self.nodes])
         activeness_v: np.ndarray = random.random((epochs, len(self.nodes))) < active_probabilities

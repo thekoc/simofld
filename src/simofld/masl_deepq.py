@@ -23,7 +23,7 @@ class DQNAgent:
         self.action_size = action_size
         self.memory = deque(maxlen=2000)
         self.gamma = 0.6  # discount rate
-        self.alpha = 0.7
+        self.alpha = 0.8
         self.epsilon = 0.9  # exploration rate
         self.epsilon_min = 0.01
         self.epsilon_decay = 0.95
@@ -35,8 +35,8 @@ class DQNAgent:
         # Neural Net for Deep-Q learning Model
         init = tf.keras.initializers.he_uniform()
         model = keras.Sequential()
-        model.add(keras.layers.Dense(24, input_dim=self.state_size, activation='relu', kernel_initializer=init))
-        model.add(keras.layers.Dense(12, activation='relu', kernel_initializer=init))
+        model.add(keras.layers.Dense(12, input_dim=self.state_size, activation='relu', kernel_initializer=init))
+        model.add(keras.layers.Dense(6, activation='relu', kernel_initializer=init))
         model.add(keras.layers.Dense(self.action_size, activation='linear', kernel_initializer=init))
         model.compile(loss=tf.keras.losses.Huber(), optimizer=tf.keras.optimizers.Adam(lr=self.learning_rate), metrics=['accuracy'])
         return model
@@ -47,7 +47,7 @@ class DQNAgent:
     def act(self, state):
         if np.random.rand() <= self.epsilon:
             return py_random.randrange(self.action_size)
-        act_values = self.model.predict([state])
+        act_values = self.model.predict(state[None, :])
         return np.argmax(act_values[0])  # returns action
 
     def replay(self, batch_size):
@@ -56,7 +56,7 @@ class DQNAgent:
         current_states = np.array([e[0] for e in minibatch])
         current_q_list = self.model.predict(current_states)
         
-        next_states = [e[3] for e in minibatch]
+        next_states = np.array([e[3] for e in minibatch])
         future_max_q_list = np.max(self.target_model.predict(next_states), axis=1)
         
         X = []
@@ -104,6 +104,7 @@ class MobileUser(MASLMobileUser):
         self._payoff_weight_energy = 0
         self._payoff_weight_time = 1 - self._payoff_weight_energy
 
+        self.payoff_logs = deque(maxlen=100)
         self.dqn_agent = DQNAgent(state_size=len(self.channels) + 1, action_size=len(self.channels) + 1)
 
     def reward(self, choice_index):
@@ -113,13 +114,29 @@ class MobileUser(MASLMobileUser):
             channel = self.channels[choice_index - 1]
             payoff = self._I(channel)
         
-        r = - 1e7 * payoff
-        return r
+        r = 1 - 1e6 * payoff
+        return max(min(r, 1), 0)
 
+    def log_payoffs(self):
+        payoffs = [self._Q()] + [self._I(channel) for channel in self.channels]
+        self.payoff_logs.append(payoffs)
 
     def get_state(self):
-        state = [self._Q()] + [self._I(channel) for channel in self.channels]
-        return state
+        recent_n = 10
+
+        if self.payoff_logs:
+            recent_n = min(len(self.payoff_logs), recent_n)
+            weight = 1 
+            state = np.zeros(len(self.channels) + 1)
+            for i in range(recent_n):
+                state += 1e6 * weight * np.array(self.payoff_logs[-(i+1)])
+                weight *= 0.98
+            state = state.clip(0, 10)
+            print(state)
+            return state
+        else:
+            return np.zeros(len(self.channels) + 1)
+
 
     async def main_loop(self):
         last_state = None
@@ -144,6 +161,7 @@ class MobileUser(MASLMobileUser):
                     last_transmission = channel.connect(self, cloud_server)
                     await self.perform_cloud_computation(cloud_server, channel, step_interval)
                 
+                self.log_payoffs()
                 state = self.get_state()
                 reward = self.reward(self._choice_index)
                 await envs.wait_for_simul_tasks()
@@ -158,11 +176,12 @@ class MobileUser(MASLMobileUser):
                 if len(self.dqn_agent.memory) > batch_size:
                     if update_count % 4 == 0:
                         self.dqn_agent.replay(batch_size)
-                    if update_count > 50:
+                    if update_count > 30:
                         self.dqn_agent.copy_weights_to_target()
                         update_count = 0
             else:
                 await envs.sleep(step_interval)
+                self.log_payoffs()
                 await envs.wait_for_simul_tasks()
 
 class CloudServer(masl.CloudServer):
