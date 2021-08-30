@@ -36,7 +36,7 @@ SIMULATION_PARAMETERS = {
     'LEARNING_RATE': 0.1,
     
     # Channel
-    'CHANNEL_SCALING_FACTOR': 2e6,
+    'CHANNEL_SCALING_FACTOR': 1e5,
 }
 
 logger = getLogger(__name__)
@@ -44,13 +44,14 @@ logger = getLogger(__name__)
 approx_betas = np.linspace(0.5, 5, 20)
 def _generate_exponential(size: Number):
     def _map(v: Number):
+        return v
         if v > 5:
             return v
         for n in approx_betas:
             if v <= n:
                 return n
     if size == 1:
-        return _map(random.standard_exponential(1))
+        return _map(random.standard_exponential(1).item())
     else:
         return [_map(v) for v in random.standard_exponential(size)]
 
@@ -83,7 +84,7 @@ class MobileUser(Node):
         self.cpu_effeciency = SIMULATION_PARAMETERS['COMPUTING_ENERGY_EFFECIENCY'][0] # Megacycles/J TODO: Random selection
         
         # The weights to calculate payoff function
-        self._payoff_weight_energy = 0
+        self._payoff_weight_energy = random.random()
         self._payoff_weight_time = 1 - self._payoff_weight_energy
 
         self._datasize = SIMULATION_PARAMETERS['DATA_SIZE']
@@ -164,8 +165,21 @@ class MobileUser(Node):
         T_loc = D_loc / F_loc
         E_loc = D_loc / self.cpu_effeciency
         return mu_T * T_loc + mu_E * E_loc
-    
+
     def generate_choice_index(self) -> Number:
+        """Genrate choice for this iteration based on probability vector `self._w`
+
+        Returns:
+            Number: The index generated (0 means local computation)
+        """
+        epsilon = 0.1
+        if random.random() < epsilon:
+            choice_index = random.choice(len(self.channels) + 1, 1).item()
+        else:
+            choice_index = random.choice(len(self.channels) + 1, 1, p=self._w).item() 
+        return choice_index
+
+    def generate_choice_index2(self) -> Number:
         """Genrate choice for this iteration based on probability vector `self._w`
 
         Returns:
@@ -202,8 +216,8 @@ class MobileUser(Node):
         cloud_server = self._get_cloud_server()
 
         # Uniform distribution for initialization
-        self._w = np.full(channel_num + 1, 1 / (channel_num + 1))
-        w = self._w
+        if self._w is None:
+            self._w = np.full(channel_num + 1, 1 / (channel_num + 1))
 
         # Uses `theta` and `gamma` to be consistent with the notions in paper
         theta = self.active_probability
@@ -212,6 +226,7 @@ class MobileUser(Node):
         last_transmission: Transmission = None
 
         while True:
+            w = self._w
             self._w_history.append(w)
             self.active = True if random.random() < theta else False
             choice_index = self.generate_choice_index()
@@ -359,6 +374,7 @@ class MASLProfile(Profile):
 
         self._system_wide_cost_samples = []
         self._node_choices = [[] for _ in nodes]
+        self._node_costs = [[] for _ in nodes]
         self._last_sample_ts = None
         super().__init__(sample_interval)
         
@@ -389,9 +405,12 @@ class MASLProfile(Profile):
         nodes = self.nodes
         for i, node in enumerate(nodes):
             self._node_choices[i].append(node._choice_index)
-        result = self.system_wide_cost_vectorized()
+        result = self.system_wide_cost()
         logger.debug(f'cost: {result}')
         self._system_wide_cost_samples.append(result)
+    
+    def system_wide_cost(self):
+        return self.system_wide_cost_vectorized_static_choice()
     
     def system_wide_cost_vectorized(self):
         epochs = 1000
@@ -442,7 +461,7 @@ class MASLProfile(Profile):
         Returns:
             Number: System wide cost.
         """
-        epochs = 10000
+        epochs = 1000
 
         betas: np.ndarray = random.standard_exponential((epochs, len(self.nodes)))
         betas = np.ceil(betas * 2) / 2
@@ -481,9 +500,11 @@ class MASLProfile(Profile):
         total_cost = 0
         for i, node in enumerate(self.nodes):
             if node._choice_index == 0:
-                total_cost += node.active_probability * node.local_cost()
+                cost = node.active_probability * node.local_cost()
             else:
-                total_cost += node.active_probability * node.cloud_cost(avg_datarates[i])
+                cost = node.active_probability * node.cloud_cost(avg_datarates[i])
+            self._node_costs[i].append(cost)
+            total_cost += cost
         return total_cost
 
 def create_env(users: List[MobileUser], cloud_server: CloudServer, profile: Optional[MASLProfile], until: Number, step_interval: Number):
