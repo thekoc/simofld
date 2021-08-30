@@ -32,6 +32,7 @@ class TestBR(unittest.TestCase):
             env.run()
     
     def test_main_algorithm(self):
+
         np_random.seed(0)
         user_num = 30
         channels = [RayleighChannel() for _ in range(5)]

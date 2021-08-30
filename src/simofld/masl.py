@@ -166,7 +166,7 @@ class MobileUser(Node):
         E_loc = D_loc / self.cpu_effeciency
         return mu_T * T_loc + mu_E * E_loc
 
-    def generate_choice_index(self) -> Number:
+    def generate_choice_index_epsilon(self) -> Number:
         """Genrate choice for this iteration based on probability vector `self._w`
 
         Returns:
@@ -179,7 +179,7 @@ class MobileUser(Node):
             choice_index = random.choice(len(self.channels) + 1, 1, p=self._w).item() 
         return choice_index
 
-    def generate_choice_index2(self) -> Number:
+    def generate_choice_index(self) -> Number:
         """Genrate choice for this iteration based on probability vector `self._w`
 
         Returns:

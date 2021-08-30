@@ -222,10 +222,10 @@ class BRProfile(Profile):
         Returns:
             Number: System wide cost.
         """
-        epochs = 10000
+        epochs = 1000
 
         betas: np.ndarray = random.standard_exponential((epochs, len(self.nodes)))
-        betas = np.ceil(betas * 2) / 2
+        # betas = np.ceil(betas * 2) / 2
 
         active_probabilities = np.array([node.active_probability for node in self.nodes])
         activeness_v: np.ndarray = random.random((epochs, len(self.nodes))) < active_probabilities

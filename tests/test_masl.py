@@ -20,18 +20,21 @@ import numpy as np
 from matplotlib import pyplot as plt
 
 
-UNTIL = 3
+UNTIL = 1200
 
 TestParameters = NamedTuple('TestParameters', [('group', str), ('gamma', Number), ('lr', Number), ('until', Number), ('user_num', int), ('channel_num', int)])
 
 
-def test_paramater(parameters: TestParameters):
-    np_random.seed(5)
+def test_paramater(parameters: TestParameters, profile_interval=1):
+    np_random.seed(0)
     SIMULATION_PARAMETERS['CHANNEL_SCALING_FACTOR'] = parameters.gamma
     SIMULATION_PARAMETERS['LEARNING_RATE'] = parameters.lr
+    distances = 5 + np_random.random(parameters.user_num) * 45
+    active_probabilities = 1 - np_random.random(parameters.user_num)
     channels = [RayleighChannel() for _ in range(parameters.channel_num)]
-    nodes = [MobileUser(channels) for _ in range(parameters.user_num)]
-    profile = MASLProfile(nodes, 1)
+    nodes = [MobileUser(channels, distance, active_probability) for distance, active_probability in zip(distances, active_probabilities)]
+    
+    profile = MASLProfile(nodes, profile_interval)
     step_interval = 1
     cloud_server = CloudServer()
     with create_env(nodes, cloud_server, profile, until=parameters.until, step_interval=step_interval) as env:
@@ -53,7 +56,7 @@ q = Queue(maxsize=1)
 q.put(0)
 
 def task(p):
-    result = test_paramater(p)
+    result = test_paramater(p, profile_interval=10)
     count = q.get()
     print('='*20 + '\n' + str(count + 1))
     q.put(count + 1)
@@ -63,31 +66,36 @@ class TestMASL(unittest.TestCase):
     def test_main_algorithm(self):
         until = UNTIL
         result_list = []
-        user_num = 20
-        channel_num = 7
+        user_num = 30
+        channel_num = 5
 
         test_parameters_list = [
-            TestParameters(group='gamma', gamma=5 * 10**4, lr=0.1, until=until, user_num=user_num, channel_num=channel_num),
-            TestParameters(group='gamma', gamma=10**5, lr=0.1, until=until, user_num=user_num, channel_num=channel_num),
-            TestParameters(group='gamma', gamma=5 * 10**5, lr=0.1, until=until, user_num=user_num, channel_num=channel_num),
-            TestParameters(group='gamma', gamma=10**6, lr=0.1, until=until, user_num=user_num, channel_num=channel_num),
+            TestParameters(group='gamma', gamma=1e3, lr=0.1, until=until, user_num=user_num, channel_num=channel_num),
+            TestParameters(group='gamma', gamma=1e4, lr=0.1, until=until, user_num=user_num, channel_num=channel_num),
+            TestParameters(group='gamma', gamma=1e5, lr=0.1, until=until, user_num=user_num, channel_num=channel_num),
+            TestParameters(group='gamma', gamma=1e6, lr=0.1, until=until, user_num=user_num, channel_num=channel_num),
 
-            TestParameters(group='lr', gamma=10**5, lr=0.06, until=until, user_num=user_num, channel_num=channel_num),
-            TestParameters(group='lr', gamma=10**5, lr=0.1, until=until, user_num=user_num, channel_num=channel_num),
-            TestParameters(group='lr', gamma=10**5, lr=0.3, until=until, user_num=user_num, channel_num=channel_num),
-            TestParameters(group='lr', gamma=10**5, lr=0.5, until=until, user_num=user_num, channel_num=channel_num),
+            TestParameters(group='lr', gamma=1e5, lr=0.05, until=until, user_num=user_num, channel_num=channel_num),
+            TestParameters(group='lr', gamma=1e5, lr=0.1, until=until, user_num=user_num, channel_num=channel_num),
+            TestParameters(group='lr', gamma=1e5, lr=0.2, until=until, user_num=user_num, channel_num=channel_num),
+            TestParameters(group='lr', gamma=1e5, lr=0.3, until=until, user_num=user_num, channel_num=channel_num),
         ]
 
 
 
-        # with Pool(2) as p:
-        #     results = p.map(task, test_parameters_list)
+        with Pool(2) as p:
+            results = p.map(task, test_parameters_list[:])
 
-        results = []
-        for p in test_parameters_list[:1]:
-            results += [task(p)]
+        # results = []
+        # for p in test_parameters_list[2:3]:
+        #     results += [task(p)]
         
-        result_list = list(zip([p._asdict() for p in test_parameters_list], results))
+        result_list = []
+        for p, r in zip(test_parameters_list, results):
+            result_list.append(
+                {**dict(p._asdict()), 'result': r}
+            )
+
         with open(f'results-{time.strftime("%Y%m%d-%H%M%S")}.json', 'w') as f:
             json.dump(result_list, f)
 
@@ -98,6 +106,40 @@ class TestMASL(unittest.TestCase):
         #     with open('results.json', 'w') as f:
         #         json.dump(result_list, f)
 
+    def test_user_channel_num(self):
+        until = UNTIL
+        test_parameters_list = [
+            TestParameters(group='user_num', gamma=1e6, lr=0.1, until=until, user_num=20, channel_num=7),
+            TestParameters(group='user_num', gamma=1e6, lr=0.1, until=until, user_num=25, channel_num=7),
+            TestParameters(group='user_num', gamma=1e6, lr=0.1, until=until, user_num=30, channel_num=7),
+            TestParameters(group='user_num', gamma=1e6, lr=0.1, until=until, user_num=35, channel_num=7),
+            TestParameters(group='user_num', gamma=1e6, lr=0.1, until=until, user_num=40, channel_num=7),
+            TestParameters(group='user_num', gamma=1e6, lr=0.1, until=until, user_num=45, channel_num=7),
+
+            TestParameters(group='channel_num', gamma=1e6, lr=0.1, until=until, user_num=40, channel_num=4),
+            TestParameters(group='channel_num', gamma=1e6, lr=0.1, until=until, user_num=40, channel_num=5),
+            TestParameters(group='channel_num', gamma=1e6, lr=0.1, until=until, user_num=40, channel_num=6),
+            TestParameters(group='channel_num', gamma=1e6, lr=0.1, until=until, user_num=40, channel_num=7),
+            TestParameters(group='channel_num', gamma=1e6, lr=0.1, until=until, user_num=40, channel_num=8),
+            TestParameters(group='channel_num', gamma=1e6, lr=0.1, until=until, user_num=40, channel_num=9),
+            TestParameters(group='channel_num', gamma=1e6, lr=0.1, until=until, user_num=40, channel_num=10),
+            TestParameters(group='channel_num', gamma=1e6, lr=0.1, until=until, user_num=40, channel_num=11),
+            TestParameters(group='channel_num', gamma=1e6, lr=0.1, until=until, user_num=40, channel_num=12),
+            TestParameters(group='channel_num', gamma=1e6, lr=0.1, until=until, user_num=40, channel_num=13),
+            TestParameters(group='channel_num', gamma=1e6, lr=0.1, until=until, user_num=40, channel_num=14),
+        ]
+
+        with Pool(2) as p:
+            results = p.map(task, test_parameters_list)
+
+        # results = []
+        # for p in test_parameters_list[:1]:
+        #     results += [task(p)]
+        
+        result_list = list(zip([p._asdict() for p in test_parameters_list], results))
+        with open(f'results-2-{time.strftime("%Y%m%d-%H%M%S")}.json', 'w') as f:
+            json.dump(result_list, f)
+        
     def test_main_algorithm_user_channel_numbers(self):
         pass
         ## User number
@@ -130,7 +172,6 @@ class TestMASL(unittest.TestCase):
         # ax2.set_ylabel('Beneficial user number')
         # ax2.set_xlabel('Channel number')
 
-print(__name__)
 
 if __name__ == '__main__':
     TestMASL().test_main_algorithm()
