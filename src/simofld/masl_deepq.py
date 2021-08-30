@@ -22,12 +22,12 @@ class DQNAgent:
         self.state_size = state_size
         self.action_size = action_size
         self.memory = deque(maxlen=2000)
-        self.gamma = 0.1    # discount rate
-        self.alpha = 0.8
-        self.epsilon = 1.0  # exploration rate
+        self.gamma = 0.6  # discount rate
+        self.alpha = 0.7
+        self.epsilon = 0.9  # exploration rate
         self.epsilon_min = 0.01
-        self.epsilon_decay = 0.98
-        self.learning_rate = 0.01
+        self.epsilon_decay = 0.95
+        self.learning_rate = 0.03
         self.model = self._build_model()
         self.target_model = self._build_model()
 
@@ -113,7 +113,7 @@ class MobileUser(MASLMobileUser):
             channel = self.channels[choice_index - 1]
             payoff = self._I(channel)
         
-        r = - 1e5 * payoff
+        r = - 1e7 * payoff
         return r
 
 
