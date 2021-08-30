@@ -161,6 +161,9 @@ class MobileUser(MASLMobileUser):
                     if update_count > 50:
                         self.dqn_agent.copy_weights_to_target()
                         update_count = 0
+            else:
+                await envs.sleep(step_interval)
+                await envs.wait_for_simul_tasks()
 
 class CloudServer(masl.CloudServer):
     pass
