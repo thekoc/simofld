@@ -47,7 +47,7 @@ class DQNAgent:
     def act(self, state):
         if np.random.rand() <= self.epsilon:
             return py_random.randrange(self.action_size)
-        act_values = self.model.predict(state)
+        act_values = self.model.predict([state])
         return np.argmax(act_values[0])  # returns action
 
     def replay(self, batch_size):
@@ -149,6 +149,8 @@ class MobileUser(MASLMobileUser):
                     action = self._choice_index
                     self.dqn_agent.memorize(last_state, action, reward, state, False)
                 last_state = state
+                self._choice_index = self.dqn_agent.act(state)
+                
                 
                 if len(self.dqn_agent.memory) > batch_size:
                     if epoch % 4 == 0:
