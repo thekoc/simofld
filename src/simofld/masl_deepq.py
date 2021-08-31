@@ -21,13 +21,13 @@ class DQNAgent:
     def __init__(self, state_size, action_size):
         self.state_size = state_size
         self.action_size = action_size
-        self.memory = deque(maxlen=2000)
-        self.gamma = 0.6  # discount rate
-        self.alpha = 0.8
+        self.memory = deque(maxlen=128)
+        self.gamma = 0.9  # discount rate
+        self.alpha = 0.7 # Q learning rate
         self.epsilon = 0.9  # exploration rate
         self.epsilon_min = 0.01
-        self.epsilon_decay = 0.95
-        self.learning_rate = 0.03
+        self.epsilon_decay_factor = 0.99
+        self.learning_rate = 0.04
         self.model = self._build_model()
         self.target_model = self._build_model()
 
@@ -77,8 +77,11 @@ class DQNAgent:
         self.model.fit(np.array(X), np.array(Y), batch_size=batch_size, verbose=0, shuffle=True)            
 
         print(f'epsilon: {self.epsilon}')
+
+    def decay_epsilon(self):
         if self.epsilon > self.epsilon_min:
-            self.epsilon *= self.epsilon_decay
+            self.epsilon *= self.epsilon_decay_factor
+        self.epsilon = max(self.epsilon, self.epsilon_min)
 
     def copy_weights_to_target(self):
         self.target_model.set_weights(self.model.get_weights())
@@ -123,7 +126,7 @@ class MobileUser(MASLMobileUser):
         self.payoff_logs.append(payoffs)
 
     def get_state(self):
-        recent_n = 10
+        recent_n = 8
 
         if self.payoff_logs:
             recent_n = min(len(self.payoff_logs), recent_n)
@@ -143,15 +146,22 @@ class MobileUser(MASLMobileUser):
         batch_size = 64
 
         last_transmission: Optional[Transmission] = None
+        last_choice_index = None
+        last_state = None
         cloud_server = self._get_cloud_server()
         step_interval = self.get_current_env().g.step_interval
         self._choice_index = random.randint(0, len(self.channels) + 1)
         update_count = 0
+        epsilon_decay_started = False
         while True:
-            self.active = True if random.random() < self.active_probability else False
+            state = self.get_state()
+            self._choice_index = self.dqn_agent.act(state)
+            await envs.wait_for_simul_tasks()
             if last_transmission:
                 last_transmission.disconnect()
                 last_transmission = None
+
+            self.active = True if random.random() < self.active_probability else False
             if self.active:
                 update_count += 1
                 if self._choice_index == 0:
@@ -159,22 +169,16 @@ class MobileUser(MASLMobileUser):
                 else:
                     channel = self.channels[self._choice_index - 1]
                     last_transmission = channel.connect(self, cloud_server)
-                    await self.perform_cloud_computation(cloud_server, channel, step_interval)
-                
-                self.log_payoffs()
-                state = self.get_state()
+                    await self.perform_cloud_computation(cloud_server, channel, step_interval)                
                 reward = self.reward(self._choice_index)
-                await envs.wait_for_simul_tasks()
-                
-                if last_state is not None:
-                    action = self._choice_index
-                    self.dqn_agent.memorize(last_state, action, reward, state, False)
-                last_state = state
-                self._choice_index = self.dqn_agent.act(state)
-                
+                self.log_payoffs()
+                new_state = self.get_state()
+                action = self._choice_index
+                self.dqn_agent.memorize(state, action, reward, new_state, False)                
                 
                 if len(self.dqn_agent.memory) > batch_size:
                     if update_count % 4 == 0:
+                        epsilon_decay_started = True
                         self.dqn_agent.replay(batch_size)
                     if update_count > 30:
                         self.dqn_agent.copy_weights_to_target()
@@ -182,7 +186,9 @@ class MobileUser(MASLMobileUser):
             else:
                 await envs.sleep(step_interval)
                 self.log_payoffs()
-                await envs.wait_for_simul_tasks()
+
+            if epsilon_decay_started:
+                self.dqn_agent.decay_epsilon()
 
 class CloudServer(masl.CloudServer):
     pass
