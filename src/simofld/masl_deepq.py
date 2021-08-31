@@ -101,7 +101,7 @@ class MobileUser(MASLMobileUser):
         self.active_probability = active_probability
         self._datasize = SIMULATION_PARAMETERS['DATA_SIZE']
         self._choice_index = None
-        self._payoff_weight_energy = 0
+        self._payoff_weight_energy = random.random()
         self._payoff_weight_time = 1 - self._payoff_weight_energy
 
         self.payoff_logs = deque(maxlen=100)
@@ -115,7 +115,8 @@ class MobileUser(MASLMobileUser):
             payoff = self._I(channel)
         
         r = 1 - 1e6 * payoff
-        return max(min(r, 1), 0)
+        r = max(min(r, 10), -10)
+        return r
 
     def log_payoffs(self):
         payoffs = [self._Q()] + [self._I(channel) for channel in self.channels]
@@ -129,10 +130,9 @@ class MobileUser(MASLMobileUser):
             weight = 1 
             state = np.zeros(len(self.channels) + 1)
             for i in range(recent_n):
-                state += 1e6 * weight * np.array(self.payoff_logs[-(i+1)])
+                state += 1e5 * weight * np.array(self.payoff_logs[-(i+1)])
                 weight *= 0.98
-            state = state.clip(0, 10)
-            print(state)
+            state = state.clip(0, 50)
             return state
         else:
             return np.zeros(len(self.channels) + 1)

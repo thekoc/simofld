@@ -195,13 +195,13 @@ def run_masl_wrapper(p_dict: dict):
 def test_masl():
     parameters = [
         {
-            'group': 'gamma', 'gamma': 1e5, 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 700, 'profile_sample_interval': 20
+            'group': 'gamma', 'gamma': 1e5, 'lr': 0.03, 'user_num': 30, 'channel_num': 5, 'until': 700, 'profile_sample_interval': 20
         }
     ]
 
     
     with Pool(os.cpu_count()) as pool:
-        results = pool.map(run_masl_wrapper, parameters * 200)
+        results = pool.map(run_masl_wrapper, parameters * 10)
     
     samples_na = np.array([result['system_cost_histogram'] for result in results])
     system_cost_histogram = list(samples_na.mean(axis=0))
@@ -301,4 +301,4 @@ def test_dq():
 
 
 if __name__ == '__main__':
-    test_dq()
+    test_masl()
