@@ -215,5 +215,7 @@ class Profile(MASLProfile):
             elif node._run_until < envs.get_current_env().now:
                 temp_nodes.append(node)
         self.nodes = temp_nodes
+        alpha = SIMULATION_PARAMETERS['PATH_LOSS_EXPONENT']
+        self.channel_powers_0 = np.array([node._x**(-alpha) * node.transmit_power for node in self.nodes]) # channel powers divied by respective rayleigh fading factors
         print(f'now: {envs.get_current_env().now}')
         return super().sample()
