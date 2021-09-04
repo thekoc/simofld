@@ -212,7 +212,7 @@ class Profile(MASLProfile):
         for node in self.nodes:
             if node._run_until is None:
                 temp_nodes.append(node)
-            elif node._run_until < envs.get_current_env().now:
+            elif node._run_until > envs.get_current_env().now:
                 temp_nodes.append(node)
         self.nodes = temp_nodes
         alpha = SIMULATION_PARAMETERS['PATH_LOSS_EXPONENT']
