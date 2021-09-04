@@ -210,7 +210,9 @@ class Profile(MASLProfile):
     def sample(self):
         temp_nodes = []
         for node in self.nodes:
-            if node._run_until is not None and node._run_until < envs.get_current_env().now:
+            if node._run_until is None:
+                temp_nodes.append(node)
+            elif node._run_until < envs.get_current_env().now:
                 temp_nodes.append(node)
         self.nodes = temp_nodes
         print(f'now: {envs.get_current_env().now}')
