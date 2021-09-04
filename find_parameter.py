@@ -258,21 +258,26 @@ def test_epsilon():
     pass
 
 
-def run_dq(group: str, gamma: Number, lr: Number, user_num: int, channel_num: int, until: Number, profile_sample_interval: Number=10):
-    masl.SIMULATION_PARAMETERS['LEARNING_RATE'] = lr
-    masl.SIMULATION_PARAMETERS['CHANNEL_SCALING_FACTOR'] = gamma
+def run_dq(group: str, user_num: int, channel_num: int, until: Number, profile_sample_interval: Number=10, distances=None, active_probabilities=None, run_until_times=None, **kwargs):
     channels = [br.RayleighChannel() for _ in range(channel_num)]
-    # distances = 25 + random.random(user_num) * 0
-    distances = 5 + random.random(user_num) * 45
-    active_probabilities = 1 - random.random(user_num)
-    # active_probabilities = np.ones_like(active_probabilities)
+    if distances is None:
+        distances = 5 + random.random(user_num) * 45
+    if active_probabilities is None:
+        active_probabilities = 1 - random.random(user_num)
+        # active_probabilities = np.ones_like(active_probabilities)
     users = [masl_deepq.MobileUser(channels, distance, active_probability) for distance, active_probability in zip(distances, active_probabilities)]
+
+    if run_until_times:
+        for i, run_until in enumerate(run_until_times):
+            users[i]._run_until = run_until
+    
     cloud_server = masl_deepq.CloudServer()
     profile = masl_deepq.Profile(users, profile_sample_interval)
 
     with masl_deepq.create_env(users, cloud_server, profile, until, 1) as env:
         env.run()
     result = {
+        'group': group,
         'system_cost_histogram': profile._system_wide_cost_samples,
         'final_system_cost': profile._system_wide_cost_samples[-1],
         'final_beneficial_user_num': len([n for n in users if n._choice_index != 0]),
@@ -285,7 +290,7 @@ def run_dq_wrapper(p_dict: dict):
 def test_dq():
     parameters = [
         {
-            'group': 'gamma', 'gamma': 1e5, 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 1
+            'group': 'deep_q_learning', 'user_num': 30, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 1
         }
     ]
     
@@ -298,34 +303,56 @@ def test_dq():
         json.dump([{**parameters[0], 'result': {'system_cost_histogram': system_cost_histogram}}], f)
 
 def test_adaptiveness():
-    channel_num = 5
-    user_num = 30
-    profile_sample_interval = 2
-    until = 1000
-    channels = [br.RayleighChannel() for _ in range(channel_num)]
-    # distances = 25 + random.random(user_num) * 0
-    distances = 5 + random.random(user_num) * 45
-    active_probabilities = 1 - random.random(user_num)
-    # active_probabilities = np.ones_like(active_probabilities)
-    users = [masl_deepq.MobileUser(channels, distance, active_probability) for distance, active_probability in zip(distances, active_probabilities)]
-    for i in range(10):
-        users[i]._run_until = 500
-    cloud_server = masl_deepq.CloudServer()
-    profile = masl_deepq.Profile(users, profile_sample_interval)
+    parameters = [
+    ]
 
-    with masl_deepq.create_env(users, cloud_server, profile, until, 1) as env:
-        env.run()
-    result = {
-        'system_cost_histogram': profile._system_wide_cost_samples,
-        'final_system_cost': profile._system_wide_cost_samples[-1],
-        'final_beneficial_user_num': len([n for n in users if n._choice_index != 0]),
-    }
+    repeat = 5
+    
+    user_num = 2
+    remain_user_num = 1
 
-    results = [result]
-    samples_na = np.array([result['system_cost_histogram'] for result in results])
+    channel_num = 1
+    
+    distances_array = 5 + random.random((repeat, user_num)) * 45
+    active_probabilities_array = 1 - random.random((repeat, user_num))
+
+    until = 30
+    stop_time = 10
+
+
+    for i in range(repeat):
+        parameters.append({
+            'group': 'deep_q_learning', 'label': 'Directly run',
+            'user_num': remain_user_num, 'channel_num': channel_num, 'until': until,'profile_sample_interval': 2,
+            'distances': list(distances_array[i][:remain_user_num]), 'activity_probabilities': list(active_probabilities_array[i][:remain_user_num]),
+        })
+
+    for i in range(repeat):
+        run_until_times = [None] * remain_user_num + [stop_time] * (user_num - remain_user_num)
+        parameters.append({
+            'group': 'deep_q_learning', 'label': 'After manually stop',
+            'user_num': user_num, 'channel_num': channel_num, 'until': until,'profile_sample_interval': 2,
+            'distances': list(distances_array[i]), 'activity_probabilities': list(active_probabilities_array[i]),
+            'run_until_times': run_until_times
+        })
+    
+    with Pool(os.cpu_count()) as pool:
+        results = pool.map(run_dq_wrapper, parameters)
+    
+    json_results = []
+    samples_na = np.array([result['system_cost_histogram'] for result in results[:repeat]])
     system_cost_histogram = list(samples_na.mean(axis=0))
+    json_results.append(
+        {**parameters[0], 'result': {'system_cost_histogram': system_cost_histogram}}
+    )
+
+    samples_na = np.array([result['system_cost_histogram'] for result in results[repeat:]])
+    system_cost_histogram = list(samples_na.mean(axis=0))
+    json_results.append(
+        {**parameters[repeat], 'result': {'system_cost_histogram': system_cost_histogram}}
+    )
     with open(f'results-{time.strftime("%Y%m%d-%H%M%S")}-dq.json', 'w') as f:
-        json.dump([{'group': 'deep_q_learning', 'result': {'system_cost_histogram': system_cost_histogram}}], f)
+        json.dump(json_results, f)
 
 
 if __name__ == '__main__':

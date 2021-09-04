@@ -107,8 +107,8 @@ if __name__ == '__main__':
             step = STEP
             cost = r['result']['system_cost_histogram']
             Y = np.convolve(cost, np.ones(step)/step, mode='valid')
+            ax.plot(Y, label=r.get('label', 'Deep Q Learning'))
 
-            ax.plot(Y, label=f'Deep Q Learning')
             # ax.set_ylim(bottom=0)
             ax.legend()
 
