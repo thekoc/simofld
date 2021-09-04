@@ -276,7 +276,6 @@ def run_dq(group: str, gamma: Number, lr: Number, user_num: int, channel_num: in
         'system_cost_histogram': profile._system_wide_cost_samples,
         'final_system_cost': profile._system_wide_cost_samples[-1],
         'final_beneficial_user_num': len([n for n in users if n._choice_index != 0]),
-        'profile': profile
     }
     return result
 
@@ -286,19 +285,48 @@ def run_dq_wrapper(p_dict: dict):
 def test_dq():
     parameters = [
         {
-            'group': 'gamma', 'gamma': 1e5, 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 700, 'profile_sample_interval': 1
+            'group': 'gamma', 'gamma': 1e5, 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 1
         }
     ]
-
     
-    # with Pool(os.cpu_count()) as pool:
-    #     results = pool.map(run_dq_wrapper, parameters * 10)
-    results = [run_dq_wrapper(parameters[0])]
+    with Pool(os.cpu_count()) as pool:
+        results = pool.map(run_dq_wrapper, parameters * 1)
+    # results = [run_dq_wrapper(parameters[0])]
     samples_na = np.array([result['system_cost_histogram'] for result in results])
     system_cost_histogram = list(samples_na.mean(axis=0))
     with open(f'results-{time.strftime("%Y%m%d-%H%M%S")}-dq.json', 'w') as f:
         json.dump([{**parameters[0], 'result': {'system_cost_histogram': system_cost_histogram}}], f)
 
+def test_adaptiveness():
+    channel_num = 5
+    user_num = 30
+    profile_sample_interval = 2
+    until = 1000
+    channels = [br.RayleighChannel() for _ in range(channel_num)]
+    # distances = 25 + random.random(user_num) * 0
+    distances = 5 + random.random(user_num) * 45
+    active_probabilities = 1 - random.random(user_num)
+    # active_probabilities = np.ones_like(active_probabilities)
+    users = [masl_deepq.MobileUser(channels, distance, active_probability) for distance, active_probability in zip(distances, active_probabilities)]
+    for i in range(10):
+        users[i]._run_until = 500
+    cloud_server = masl_deepq.CloudServer()
+    profile = masl_deepq.Profile(users, profile_sample_interval)
+
+    with masl_deepq.create_env(users, cloud_server, profile, until, 1) as env:
+        env.run()
+    result = {
+        'system_cost_histogram': profile._system_wide_cost_samples,
+        'final_system_cost': profile._system_wide_cost_samples[-1],
+        'final_beneficial_user_num': len([n for n in users if n._choice_index != 0]),
+    }
+
+    results = [result]
+    samples_na = np.array([result['system_cost_histogram'] for result in results])
+    system_cost_histogram = list(samples_na.mean(axis=0))
+    with open(f'results-{time.strftime("%Y%m%d-%H%M%S")}-dq.json', 'w') as f:
+        json.dump([{'group': 'deep_q_learning', 'result': {'system_cost_histogram': system_cost_histogram}}], f)
+
 
 if __name__ == '__main__':
-    test_masl()
+    test_adaptiveness()

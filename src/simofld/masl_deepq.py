@@ -27,7 +27,7 @@ class DQNAgent:
         self.epsilon = 0.9  # exploration rate
         self.epsilon_min = 0.01
         self.epsilon_decay_factor = 0.99
-        self.learning_rate = 0.04
+        self.learning_rate = 0.03
         self.model = self._build_model()
         self.target_model = self._build_model()
 
@@ -93,10 +93,11 @@ class DQNAgent:
         self.model.save_weights(name)
 
 class MobileUser(MASLMobileUser):
-    def __init__(self, channels: List[RayleighChannel], distance: Optional[Number]=None, active_probability: Optional[Number]=None) -> None:
+    def __init__(self, channels: List[RayleighChannel], distance: Optional[Number]=None, active_probability: Optional[Number]=None, run_until: Optional[Number]=None) -> None:
         super().__init__(channels=channels, distance=distance, active_probability=active_probability)
         self.channels = channels
         self._x = distance 
+        self._run_until = run_until
         self.transmit_power = SIMULATION_PARAMETERS['TRANSMIT_POWER'] # p_i
         self.active = None
         self.cpu_frequency = SIMULATION_PARAMETERS['LOCAL_CPU_CAPABILITY'][0] # Megacycles/s
@@ -142,18 +143,18 @@ class MobileUser(MASLMobileUser):
 
 
     async def main_loop(self):
-        last_state = None
         batch_size = 64
 
         last_transmission: Optional[Transmission] = None
-        last_choice_index = None
-        last_state = None
         cloud_server = self._get_cloud_server()
         step_interval = self.get_current_env().g.step_interval
         self._choice_index = random.randint(0, len(self.channels) + 1)
         update_count = 0
         epsilon_decay_started = False
         while True:
+            if self._run_until is not None and self.get_current_env().now > self._run_until:
+                break
+
             state = self.get_state()
             self._choice_index = self.dqn_agent.act(state)
             await envs.wait_for_simul_tasks()
@@ -184,8 +185,20 @@ class MobileUser(MASLMobileUser):
                         self.dqn_agent.copy_weights_to_target()
                         update_count = 0
             else:
+                update_count += 1
                 await envs.sleep(step_interval)
+                reward = self.reward(self._choice_index)
                 self.log_payoffs()
+                new_state = self.get_state()
+                action = self._choice_index
+                self.dqn_agent.memorize(state, action, reward, new_state, False)                
+                if len(self.dqn_agent.memory) > batch_size:
+                    if update_count % 4 == 0:
+                        epsilon_decay_started = True
+                        self.dqn_agent.replay(batch_size)
+                    if update_count > 30:
+                        self.dqn_agent.copy_weights_to_target()
+                        update_count = 0
 
             if epsilon_decay_started:
                 self.dqn_agent.decay_epsilon()
