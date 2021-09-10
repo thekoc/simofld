@@ -30,11 +30,10 @@ if __name__ == '__main__':
         fig, ax = plt.subplots()
         for r in gamma_results:
             step = STEP
-            gamma = r['gamma']
+            gamma =  r.get('gamma', 0)
             cost = r['result']['system_cost_histogram']
             Y = np.convolve(cost, np.ones(step)/step, mode='valid')
-
-            ax.plot(Y, label=f'gamma: {gamma:e}')
+            ax.plot(Y, label=r.get('label', f'gamma: {gamma:e}'))
             # ax.set_ylim(bottom=0)
             ax.legend()
     

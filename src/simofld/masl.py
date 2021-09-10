@@ -94,6 +94,8 @@ class MobileUser(Node):
 
         self._datasize = SIMULATION_PARAMETERS['DATA_SIZE']
 
+        self._epsilon = None
+
     def _psi(self, bandwidth: Number) -> Number:
         """Used to calculate `self._I()`.
 
@@ -177,11 +179,14 @@ class MobileUser(Node):
         Returns:
             Number: The index generated (0 means local computation)
         """
-        epsilon = 0.1
-        if random.random() < epsilon:
+        if self._epsilon is None:
+            self._epsilon = 0.9
+        if random.random() < self._epsilon:
             choice_index = random.choice(len(self.channels) + 1, 1).item()
         else:
             choice_index = random.choice(len(self.channels) + 1, 1, p=self._w).item() 
+        self._epsilon = self._epsilon * 0.98
+        self._epsilon = max(self._epsilon, 0.01)
         return choice_index
 
     def generate_choice_index(self) -> Number:

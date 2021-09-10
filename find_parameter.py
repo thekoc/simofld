@@ -164,16 +164,20 @@ def test_br():
     
     samples_na = np.array([result['system_cost_histogram'] for result in results])
     system_cost_histogram = list(samples_na.mean(axis=0))
-    with open(f'results-test-br-{time.strftime("%Y%m%d-%H%M%S")}.json', 'w') as f:
+    with open(f'results-{time.strftime("%Y%m%d-%H%M%S")}-br.json', 'w') as f:
         json.dump([{**parameters[0], 'result': {'system_cost_histogram': system_cost_histogram}}], f)
 
-def run_masl(group: str, gamma: Number, lr: Number, user_num: int, channel_num: int, until: Number, profile_sample_interval: Number=10):
+def run_masl(group: str, gamma: Number, lr: Number, user_num: int, channel_num: int, until: Number, profile_sample_interval: Number=10, distances=None, active_probabilities=None, **kwargs):
     masl.SIMULATION_PARAMETERS['LEARNING_RATE'] = lr
     masl.SIMULATION_PARAMETERS['CHANNEL_SCALING_FACTOR'] = gamma
     channels = [br.RayleighChannel() for _ in range(channel_num)]
-    # distances = 25 + random.random(user_num) * 0
-    distances = 5 + random.random(user_num) * 45
-    active_probabilities = 1 - random.random(user_num)
+    if distances is None:
+        distances = 5 + random.random(user_num) * 45
+    if active_probabilities is None:
+        active_probabilities = 1 - random.random(user_num)
+        # active_probabilities = np.ones_like(active_probabilities)
+    users = [masl_deepq.MobileUser(channels, distance, active_probability) for distance, active_probability in zip(distances, active_probabilities)]
+
     # active_probabilities = np.ones_like(active_probabilities)
     users = [masl.MobileUser(channels, distance, active_probability) for distance, active_probability in zip(distances, active_probabilities)]
     cloud_server = masl.CloudServer()
@@ -255,7 +259,59 @@ def test_local_cost():
     print(f'total: {profile._system_wide_cost_samples[-1]}, local: {sum([u.local_cost() * u.active_probability for u in users])}')
 
 def test_epsilon():
-    pass
+    parameters_1 = [
+    ]
+    parameters_2 = [
+    ]
+    repeat = 150
+    
+    user_num = 30
+
+    channel_num = 5
+    
+    distances_array = 5 + random.random((repeat, user_num)) * 45
+    active_probabilities_array = 1 - random.random((repeat, user_num))
+
+    until = 500
+
+
+    for i in range(repeat):
+        parameters_1.append({
+            'group': 'gamma', 'label': 'normal', 'gamma': 1e5, 'lr': 0.1,
+            'user_num': user_num, 'channel_num': channel_num, 'until': until,'profile_sample_interval': 2,
+            'distances': list(distances_array[i]), 'activity_probabilities': list(active_probabilities_array[i]),
+        })
+
+    g1 = masl.MobileUser.generate_choice_index
+    g2 = masl.MobileUser.generate_choice_index_epsilon
+    masl.MobileUser.generate_choice_index = g1
+    with Pool(os.cpu_count()) as pool:
+        results_1 = pool.map(run_masl_wrapper, parameters_1)
+
+    for i in range(repeat):
+        parameters_2.append({
+            'group': 'gamma', 'label': 'epsilon', 'gamma': 1e5, 'lr': 0.1,
+            'user_num': user_num, 'channel_num': channel_num, 'until': until,'profile_sample_interval': 2,
+            'distances': list(distances_array[i]), 'activity_probabilities': list(active_probabilities_array[i]),
+        })
+    masl.MobileUser.generate_choice_index = g2
+    with Pool(os.cpu_count()) as pool:
+        results_2 = pool.map(run_masl_wrapper, parameters_2)
+    
+    json_results = []
+    samples_na = np.array([result['system_cost_histogram'] for result in results_1])
+    system_cost_histogram = list(samples_na.mean(axis=0))
+    json_results.append(
+        {**parameters_1[0], 'result': {'system_cost_histogram': system_cost_histogram}}
+    )
+
+    samples_na = np.array([result['system_cost_histogram'] for result in results_2])
+    system_cost_histogram = list(samples_na.mean(axis=0))
+    json_results.append(
+        {**parameters_2[0], 'result': {'system_cost_histogram': system_cost_histogram}}
+    )
+    with open(f'results-{time.strftime("%Y%m%d-%H%M%S")}-masl_epsilon.json', 'w') as f:
+        json.dump(json_results, f)
 
 
 def run_dq(group: str, user_num: int, channel_num: int, until: Number, profile_sample_interval: Number=10, distances=None, active_probabilities=None, run_until_times=None, **kwargs):
@@ -356,4 +412,4 @@ def test_adaptiveness():
 
 
 if __name__ == '__main__':
-    test_adaptiveness()
+    test_epsilon()
