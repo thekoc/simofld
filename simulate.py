@@ -69,7 +69,7 @@ def run_simulation_repeat(repeat: int, parameter):
     
 
 def test_different_gammas():
-    repeat= 250
+    repeat = 250
     parameters = [
         {'group': 'gamma', 'algorithm': 'masl', 'gamma': 1e3, 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 10,},
         {'group': 'gamma', 'algorithm': 'masl', 'gamma': 1e4, 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 10,},
@@ -84,5 +84,41 @@ def test_different_gammas():
         json.dump(results, f)
 
 
+def test_different_user_numbers():
+    repeat = 250
+    parameters = [
+        {'group': 'user_num', 'algorithm': 'masl', 'gamma': 1e5, 'lr': 0.1, 'user_num': 20, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500},
+        {'group': 'user_num', 'algorithm': 'masl', 'gamma': 1e5, 'lr': 0.1, 'user_num': 25, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500},
+        {'group': 'user_num', 'algorithm': 'masl', 'gamma': 1e5, 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500},
+        {'group': 'user_num', 'algorithm': 'masl', 'gamma': 1e5, 'lr': 0.1, 'user_num': 35, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500},
+        {'group': 'user_num', 'algorithm': 'masl', 'gamma': 1e5, 'lr': 0.1, 'user_num': 40, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500},
+        {'group': 'user_num', 'algorithm': 'masl', 'gamma': 1e5, 'lr': 0.1, 'user_num': 45, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500},
+    ]
+    results = []
+    for parameter in parameters:
+        results.append(run_simulation_repeat(repeat, parameter))
+        print(parameter)
+    with open(f'results-{time.strftime("%Y%m%d-%H%M%S")}-masl-user-num.json', 'w') as f:
+        json.dump(results, f)
+
+
+def test_different_channel_numbers():
+    repeat = 250
+    parameters = [
+        {'group': 'channel_num', 'algorithm': 'masl', 'gamma': 1e5, 'lr': 0.1, 'user_num': 30, 'channel_num': 4, 'until': 500, 'profile_sample_interval': 500},
+        {'group': 'channel_num', 'algorithm': 'masl', 'gamma': 1e5, 'lr': 0.1, 'user_num': 30, 'channel_num': 6, 'until': 500, 'profile_sample_interval': 500},
+        {'group': 'channel_num', 'algorithm': 'masl', 'gamma': 1e5, 'lr': 0.1, 'user_num': 30, 'channel_num': 8, 'until': 500, 'profile_sample_interval': 500},
+        {'group': 'channel_num', 'algorithm': 'masl', 'gamma': 1e5, 'lr': 0.1, 'user_num': 30, 'channel_num': 10, 'until': 500, 'profile_sample_interval': 500},
+        {'group': 'channel_num', 'algorithm': 'masl', 'gamma': 1e5, 'lr': 0.1, 'user_num': 30, 'channel_num': 12, 'until': 500, 'profile_sample_interval': 500},
+        {'group': 'channel_num', 'algorithm': 'masl', 'gamma': 1e5, 'lr': 0.1, 'user_num': 30, 'channel_num': 14, 'until': 500, 'profile_sample_interval': 500},
+    ]
+    results = []
+    for parameter in parameters:
+        results.append(run_simulation_repeat(repeat, parameter))
+        print(parameter)
+    with open(f'results-{time.strftime("%Y%m%d-%H%M%S")}-masl-channel-num.json', 'w') as f:
+        json.dump(results, f)
+
+
 if __name__ == '__main__':
-    test_different_gammas()
+    test_different_channel_numbers()

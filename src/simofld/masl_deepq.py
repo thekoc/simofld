@@ -31,15 +31,45 @@ class DQNAgent:
         self.model = self._build_model()
         self.target_model = self._build_model()
 
-    def _build_model(self):
-        # Neural Net for Deep-Q learning Model
-        init = tf.keras.initializers.he_uniform()
-        model = keras.Sequential()
-        model.add(keras.layers.Dense(12, input_dim=self.state_size, activation='relu', kernel_initializer=init))
-        model.add(keras.layers.Dense(6, activation='relu', kernel_initializer=init))
-        model.add(keras.layers.Dense(self.action_size, activation='linear', kernel_initializer=init))
-        model.compile(loss=tf.keras.losses.Huber(), optimizer=tf.keras.optimizers.Adam(lr=self.learning_rate), metrics=['accuracy'])
-        return model
+    def _build_model(self, enable_dueling=True):
+        if enable_dueling:
+            input_shape = (self.state_size,)
+            output_shape = (self.action_size,)
+            X_input = keras.layers.Input(shape=input_shape)
+            X = X_input
+
+            # 'Dense' is the basic form of a neural network layer
+            # Input Layer of state size(4) and Hidden Layer with 512 nodes
+            X = keras.layers.Dense(512, input_shape=input_shape, activation="relu", kernel_initializer='he_uniform')(X)
+
+            # Hidden layer with 256 nodes
+            X = keras.layers.Dense(256, activation="relu", kernel_initializer='he_uniform')(X)
+            
+            # Hidden layer with 64 nodes
+            X = keras.layers.Dense(64, activation="relu", kernel_initializer='he_uniform')(X)
+
+            state_value = keras.layers.Dense(1, kernel_initializer='he_uniform')(X)
+            state_value = keras.layers.Lambda(lambda s: keras.backend.K.expand_dims(s[:, 0], -1), output_shape=output_shape)(state_value)
+
+            action_advantage = keras.layers.Dense(output_shape, kernel_initializer='he_uniform')(X)
+            action_advantage = keras.layers.Lambda(lambda a: a[:, :] - keras.backends.K.mean(a[:, :], keepdims=True), output_shape=output_shape)(action_advantage)
+
+            X = keras.layers.Add()([state_value, action_advantage])
+
+            model = keras.Model(inputs = X_input, outputs = X, name='CartPole Dueling DDQN model')
+            model.compile(loss="mean_squared_error", optimizer=keras.optimizers.Adam(lr=self.learning_rate), metrics=["accuracy"])
+
+            model.summary()
+            return model
+        else:
+            # Neural Net for Deep-Q learning Model
+            init = tf.keras.initializers.he_uniform()
+            model = keras.Sequential()
+            model.add(keras.layers.Dense(12, input_dim=self.state_size, activation='relu', kernel_initializer=init))
+            model.add(keras.layers.Dense(6, activation='relu', kernel_initializer=init))
+            model.add(keras.layers.Dense(self.action_size, activation='linear', kernel_initializer=init))
+            model.compile(loss=tf.keras.losses.Huber(), optimizer=tf.keras.optimizers.Adam(lr=self.learning_rate), metrics=['accuracy'])
+            return model
 
     def memorize(self, state, action, reward, next_state, done):
         self.memory.append((state, action, reward, next_state, done))
