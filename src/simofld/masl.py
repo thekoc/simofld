@@ -471,7 +471,7 @@ class Profile(ABCProfile):
         Returns:
             Number: System wide cost.
         """
-        epochs = 1000
+        epochs = 100
         if SIMULATION_PARAMETERS['CONSTANT_BETAS']:
             betas = np.ones((epochs, len(self.nodes)))
         else:

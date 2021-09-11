@@ -79,6 +79,7 @@ def test_different_gammas():
     results = []
     for parameter in parameters:
         results.append(run_simulation_repeat(repeat, parameter))
+        print(parameter)
     with open(f'results-{time.strftime("%Y%m%d-%H%M%S")}-masl-gamma.json', 'w') as f:
         json.dump(results, f)
 
