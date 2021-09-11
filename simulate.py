@@ -69,7 +69,7 @@ def run_simulation_repeat(repeat: int, parameter):
     
 
 def test_different_gammas():
-    repeat= 500
+    repeat= 250
     parameters = [
         {'group': 'gamma', 'algorithm': 'masl', 'gamma': 1e3, 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 10,},
         {'group': 'gamma', 'algorithm': 'masl', 'gamma': 1e4, 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 10,},
