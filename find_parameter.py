@@ -31,7 +31,7 @@ def generate_profile(seed=None):
     channels = [model.RayleighChannel() for _ in range(channel_num)]
     users = [model.MobileUser(channels, distance, active_probability) for distance, active_probability in zip(distances, active_probabilities)]
     cloud_server = model.CloudServer()
-    profile = model.MASLProfile(users, 2)
+    profile = model.Profile(users, 2)
     with model.create_env(users, cloud_server, profile, until=until, step_interval=step_interval) as env:
         env.run()
     return {
@@ -92,7 +92,7 @@ def main():
 def find_initial():
     total = 0
     for i in range(1000):
-        profile: masl.MASLProfile = generate_profile()['profile']
+        profile: masl.Profile = generate_profile()['profile']
         r = profile._system_wide_cost_samples[0]
         print(i, r)
         # if r > 10000:
@@ -118,7 +118,7 @@ def w_history():
     channels = [model.RayleighChannel() for _ in range(channel_num)]
     users = [model.MobileUser(channels, distance, active_probability) for distance, active_probability in zip(distances, active_probabilities)]
     cloud_server = model.CloudServer()
-    profile = model.MASLProfile(users, 1)
+    profile = model.Profile(users, 1)
     with model.create_env(users, cloud_server, profile, until=until, step_interval=step_interval) as env:
         env.run()
     for j in range(3):
@@ -181,7 +181,7 @@ def run_masl(group: str, gamma: Number, lr: Number, user_num: int, channel_num: 
     # active_probabilities = np.ones_like(active_probabilities)
     users = [masl.MobileUser(channels, distance, active_probability) for distance, active_probability in zip(distances, active_probabilities)]
     cloud_server = masl.CloudServer()
-    profile = masl.MASLProfile(users, profile_sample_interval)
+    profile = masl.Profile(users, profile_sample_interval)
 
     with masl.create_env(users, cloud_server, profile, until, 1) as env:
         env.run()
@@ -218,8 +218,8 @@ def test_cost_func():
     profile_sample_interval = 10
     until = 1
 
-    static_choice = masl.MASLProfile.system_wide_cost_vectorized_static_choice
-    dynamic_choice = masl.MASLProfile.system_wide_cost_vectorized
+    static_choice = masl.Profile.system_wide_cost_vectorized_static_choice
+    dynamic_choice = masl.Profile.system_wide_cost_vectorized
 
     channels = [br.RayleighChannel() for _ in range(channel_num)]
     distances = 5 + random.random(user_num) * 45
@@ -232,14 +232,14 @@ def test_cost_func():
         user._w = np.zeros(len(channels) + 1)
         user._w[0] = 1
 
-    profile = masl.MASLProfile(users, profile_sample_interval)
-    masl.MASLProfile.system_wide_cost = static_choice
+    profile = masl.Profile(users, profile_sample_interval)
+    masl.Profile.system_wide_cost = static_choice
     with masl.create_env(users, cloud_server, profile, until, 1) as env:
         env.run()
     print(profile._system_wide_cost_samples[0])
 
-    profile = masl.MASLProfile(users, profile_sample_interval)
-    masl.MASLProfile.system_wide_cost = dynamic_choice
+    profile = masl.Profile(users, profile_sample_interval)
+    masl.Profile.system_wide_cost = dynamic_choice
     with masl.create_env(users, cloud_server, profile, until, 1) as env:
         env.run()
     print(profile._system_wide_cost_samples[0])
@@ -250,7 +250,7 @@ def test_local_cost():
     }
 
     result = run_masl(**p)
-    profile: masl.MASLProfile = result['profile']
+    profile: masl.Profile = result['profile']
     users = profile.nodes
     user_costs = profile._node_costs
     for i, u in enumerate(users):

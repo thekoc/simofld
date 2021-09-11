@@ -12,7 +12,7 @@ import numpy as np
 from numpy import log2, random
 
 from . import envs
-from .model import Node, Channel, Profile, SimulationEnvironment, Transmission
+from .model import Node, Channel, Profile as ABCProfile, SimulationEnvironment, Transmission
 
 SIMULATION_PARAMETERS = {
     # CHART
@@ -372,7 +372,7 @@ class CloudServer(Node):
         super().__init__()
         self.cpu_frequency: Number = SIMULATION_PARAMETERS['CLOUD_CPU_CAPABILITY'] # Megacycles/s
 
-class MASLProfile(Profile):
+class Profile(ABCProfile):
     """This is the class to profile the system.
     """
     def __init__(self, nodes: List[MobileUser], sample_interval: Number) -> None:
@@ -519,7 +519,7 @@ class MASLProfile(Profile):
             total_cost += cost
         return total_cost
 
-def create_env(users: List[MobileUser], cloud_server: CloudServer, profile: Optional[MASLProfile], until: Number, step_interval: Number):
+def create_env(users: List[MobileUser], cloud_server: CloudServer, profile: Optional[Profile], until: Number, step_interval: Number):
     env = SimulationEnvironment(users, until, profile)
     env.g.cloud_server = cloud_server
     env.g.step_interval = step_interval

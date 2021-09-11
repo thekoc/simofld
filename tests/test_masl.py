@@ -10,7 +10,7 @@ sys.path.insert(0, str(src))
 import unittest
 from multiprocessing import Pool, Queue
 import json
-from simofld.masl import CloudServer, MASLProfile, MobileUser, RayleighChannel, create_env
+from simofld.masl import CloudServer, Profile as MASLProfile, MobileUser, RayleighChannel, create_env
 from simofld.masl import SIMULATION_PARAMETERS
 from simofld import envs, exceptions
 from simofld.model import Channel, Node

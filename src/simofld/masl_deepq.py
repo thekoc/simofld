@@ -12,7 +12,7 @@ import tensorflow as tf
 from . import envs
 from .model import Node, Channel, SimulationEnvironment, Transmission
 from .masl import SIMULATION_PARAMETERS, RayleighChannel, create_env
-from .masl import MobileUser as MASLMobileUser, MASLProfile as MASLProfile
+from .masl import MobileUser as MASLMobileUser, Profile as MASLProfile
 from simofld import masl
 logger = getLogger(__name__)
 

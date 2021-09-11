@@ -9,7 +9,7 @@ import numpy as np
 from numpy import log2, random
 
 from . import envs
-from .model import Node, Channel, Profile, SimulationEnvironment, Transmission
+from .model import Node, Channel, Profile as ABCProfile, SimulationEnvironment, Transmission
 from .masl import SIMULATION_PARAMETERS, RayleighChannel, create_env
 logger = getLogger(__name__)
 
@@ -26,7 +26,7 @@ class MobileUser(Node):
         self.active_probability = active_probability
         self._datasize = SIMULATION_PARAMETERS['DATA_SIZE']
         self._choice_index = None
-        self._payoff_weight_energy = 0
+        self._payoff_weight_energy = random.random()
         self._payoff_weight_time = 1 - self._payoff_weight_energy
 
     async def perform_cloud_computation(self, cloud_server: 'CloudServer', channel: Channel, upload_duration: Number, datarate: Number):
@@ -169,7 +169,7 @@ class CloudServer(Node):
         return await task
 
 
-class BRProfile(Profile):
+class Profile(ABCProfile):
     """This is the class to profile the system.
     """
     def __init__(self, nodes: List[MobileUser], sample_interval: Number) -> None:
