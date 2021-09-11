@@ -8,7 +8,7 @@ import numpy as np
 from numpy import log2, random
 from tensorflow import keras
 import tensorflow as tf
-
+import tensorflow.keras.backend as K
 from . import envs
 from .model import Node, Channel, SimulationEnvironment, Transmission
 from .masl import SIMULATION_PARAMETERS, RayleighChannel, create_env
@@ -40,23 +40,23 @@ class DQNAgent:
 
             # 'Dense' is the basic form of a neural network layer
             # Input Layer of state size(4) and Hidden Layer with 512 nodes
-            X = keras.layers.Dense(512, input_shape=input_shape, activation="relu", kernel_initializer='he_uniform')(X)
+            X = keras.layers.Dense(12, input_shape=input_shape, activation="relu", kernel_initializer='he_uniform')(X)
 
             # Hidden layer with 256 nodes
-            X = keras.layers.Dense(256, activation="relu", kernel_initializer='he_uniform')(X)
+            X = keras.layers.Dense(6, activation="relu", kernel_initializer='he_uniform')(X)
             
             # Hidden layer with 64 nodes
-            X = keras.layers.Dense(64, activation="relu", kernel_initializer='he_uniform')(X)
+            # X = keras.layers.Dense(3, activation="relu", kernel_initializer='he_uniform')(X)
 
             state_value = keras.layers.Dense(1, kernel_initializer='he_uniform')(X)
-            state_value = keras.layers.Lambda(lambda s: keras.backend.K.expand_dims(s[:, 0], -1), output_shape=output_shape)(state_value)
+            state_value = keras.layers.Lambda(lambda s: K.expand_dims(s[:, 0], -1), output_shape=output_shape)(state_value)
 
-            action_advantage = keras.layers.Dense(output_shape, kernel_initializer='he_uniform')(X)
-            action_advantage = keras.layers.Lambda(lambda a: a[:, :] - keras.backends.K.mean(a[:, :], keepdims=True), output_shape=output_shape)(action_advantage)
+            action_advantage = keras.layers.Dense(self.action_size, kernel_initializer='he_uniform')(X)
+            action_advantage = keras.layers.Lambda(lambda a: a[:, :] - K.mean(a[:, :], keepdims=True), output_shape=output_shape)(action_advantage)
 
             X = keras.layers.Add()([state_value, action_advantage])
 
-            model = keras.Model(inputs = X_input, outputs = X, name='CartPole Dueling DDQN model')
+            model = keras.Model(inputs = X_input, outputs=X)
             model.compile(loss="mean_squared_error", optimizer=keras.optimizers.Adam(lr=self.learning_rate), metrics=["accuracy"])
 
             model.summary()
