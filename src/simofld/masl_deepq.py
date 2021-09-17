@@ -217,18 +217,6 @@ class MobileUser(MASLMobileUser):
             else:
                 update_count += 1
                 await envs.sleep(step_interval)
-                reward = self.reward(self._choice_index)
-                self.log_payoffs()
-                new_state = self.get_state()
-                action = self._choice_index
-                self.dqn_agent.memorize(state, action, reward, new_state, False)                
-                if len(self.dqn_agent.memory) > batch_size:
-                    if update_count % 4 == 0:
-                        epsilon_decay_started = True
-                        self.dqn_agent.replay(batch_size)
-                    if update_count > 30:
-                        self.dqn_agent.copy_weights_to_target()
-                        update_count = 0
 
             if epsilon_decay_started:
                 self.dqn_agent.decay_epsilon()
