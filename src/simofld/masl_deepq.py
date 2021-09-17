@@ -181,6 +181,7 @@ class MobileUser(MASLMobileUser):
         self._choice_index = random.randint(0, len(self.channels) + 1)
         update_count = 0
         epsilon_decay_started = False
+        self._choice_index = random.choice(len(self.channels) + 1, 1).item() 
         while True:
             if self._run_until is not None and self.get_current_env().now > self._run_until:
                 break

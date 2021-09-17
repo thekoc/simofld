@@ -239,7 +239,7 @@ class MobileUser(Node):
             w = self._w
             self._w_history.append(w)
             self.active = True if random.random() < theta else False
-            choice_index = self.generate_choice_index()
+            choice_index = self.generate_choice_index_epsilon()
             self._choice_index = choice_index
 
             if last_transmission:
