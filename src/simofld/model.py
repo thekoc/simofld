@@ -109,13 +109,15 @@ class Channel(EnvironmentEntity):
         return LocalData(datasize, to_node)
 
 class Profile:
-    def __init__(self, sample_interval: Number) -> None:
+    def __init__(self, sample_interval: Number, no_sample_until=None) -> None:
         self.sample_interval = sample_interval
+        self.no_sample_until = no_sample_until
 
     async def main_loop(self):
         while True:
             await envs.wait_for_simul_tasks()
-            self.sample()
+            if self.no_sample_until is None or envs.get_current_env().now >= self.no_sample_until:
+                self.sample()
             await envs.sleep(self.sample_interval)
 
     def sample(self):

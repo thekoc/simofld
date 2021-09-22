@@ -31,7 +31,7 @@ class DQNAgent:
         self.model = self._build_model()
         self.target_model = self._build_model()
 
-    def _build_model(self, enable_dueling=True):
+    def _build_model(self, enable_dueling=False):
         if enable_dueling:
             input_shape = (self.state_size,)
             output_shape = (self.action_size,)
@@ -123,23 +123,10 @@ class DQNAgent:
         self.model.save_weights(name)
 
 class MobileUser(MASLMobileUser):
-    def __init__(self, channels: List[RayleighChannel], distance: Optional[Number]=None, active_probability: Optional[Number]=None, run_until: Optional[Number]=None) -> None:
+    def __init__(self, channels: List[RayleighChannel], distance: Optional[Number]=None, active_probability: Optional[Number]=None, run_until: Optional[Number]=None, enable_dueling=False) -> None:
         super().__init__(channels=channels, distance=distance, active_probability=active_probability)
-        self.channels = channels
-        self._x = distance 
-        self._run_until = run_until
-        self.transmit_power = SIMULATION_PARAMETERS['TRANSMIT_POWER'] # p_i
-        self.active = None
-        self.cpu_frequency = SIMULATION_PARAMETERS['LOCAL_CPU_CAPABILITY'][0] # Megacycles/s
-        self.cpu_effeciency = SIMULATION_PARAMETERS['COMPUTING_ENERGY_EFFECIENCY'][0] # Megacycles/J TODO: Random selection
-        self.active_probability = active_probability
-        self._datasize = SIMULATION_PARAMETERS['DATA_SIZE']
-        self._choice_index = None
-        self._payoff_weight_energy = random.random()
-        self._payoff_weight_time = 1 - self._payoff_weight_energy
-
         self.payoff_logs = deque(maxlen=100)
-        self.dqn_agent = DQNAgent(state_size=len(self.channels) + 1, action_size=len(self.channels) + 1)
+        self.dqn_agent = DQNAgent(state_size=len(self.channels) + 1, action_size=len(self.channels) + 1, enable_dueling=enable_dueling)
 
     def reward(self, choice_index):
         if choice_index == 0:
@@ -188,6 +175,7 @@ class MobileUser(MASLMobileUser):
 
             state = self.get_state()
             self._choice_index = self.dqn_agent.act(state)
+            print(self._choice_index)
             await envs.wait_for_simul_tasks()
             if last_transmission:
                 last_transmission.disconnect()

@@ -350,7 +350,7 @@ def test_dq():
         }
     ]
     with Pool(os.cpu_count()) as pool:
-        results = pool.map(run_dq_wrapper, parameters * 50)
+        results = pool.map(run_dq_wrapper, parameters * 1)
     # results = [run_dq_wrapper(parameters[0])]
     samples_na = np.array([result['system_cost_histogram'] for result in results])
     system_cost_histogram = list(samples_na.mean(axis=0))

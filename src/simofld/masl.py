@@ -7,6 +7,7 @@ from typing import List, Optional
 from functools import lru_cache
 from numbers import Number
 from logging import getLogger
+import random as py_random
 
 import numpy as np
 from numpy import log2, random
@@ -85,11 +86,11 @@ class MobileUser(Node):
         self.transmit_power = SIMULATION_PARAMETERS['TRANSMIT_POWER'] # p_i
         self.active = None
 
-        self.cpu_frequency = SIMULATION_PARAMETERS['LOCAL_CPU_CAPABILITY'][0] # Megacycles/s
-        self.cpu_effeciency = SIMULATION_PARAMETERS['COMPUTING_ENERGY_EFFECIENCY'][0] # Megacycles/J TODO: Random selection
+        self.cpu_frequency = py_random.choice(SIMULATION_PARAMETERS['LOCAL_CPU_CAPABILITY']) # Megacycles/s
+        self.cpu_effeciency = py_random.choice(SIMULATION_PARAMETERS['COMPUTING_ENERGY_EFFECIENCY']) # Megacycles/J TODO: Random selection
         
         # The weights to calculate payoff function
-        self._payoff_weight_energy = random.random()
+        self._payoff_weight_energy = py_random.choice(SIMULATION_PARAMETERS['COMPUTATIONAL_ENERGY_WEIGHT'])
         self._payoff_weight_time = 1 - self._payoff_weight_energy
 
         self._datasize = SIMULATION_PARAMETERS['DATA_SIZE']
@@ -375,7 +376,7 @@ class CloudServer(Node):
 class Profile(ABCProfile):
     """This is the class to profile the system.
     """
-    def __init__(self, nodes: List[MobileUser], sample_interval: Number) -> None:
+    def __init__(self, nodes: List[MobileUser], sample_interval: Number, no_sample_until=None) -> None:
         self.nodes = nodes
 
         # Prepare vectors for system-wide cost calculation
@@ -386,7 +387,7 @@ class Profile(ABCProfile):
         self._node_choices = [[] for _ in nodes]
         self._node_costs = [[] for _ in nodes]
         self._last_sample_ts = None
-        super().__init__(sample_interval)
+        super().__init__(sample_interval, no_sample_until)
         
     def sample(self):
         logger.info(f'Sampling..., now: {envs.get_current_env().now}')
@@ -471,7 +472,7 @@ class Profile(ABCProfile):
         Returns:
             Number: System wide cost.
         """
-        epochs = 900
+        epochs = 1000
         if SIMULATION_PARAMETERS['CONSTANT_BETAS']:
             betas = np.ones((epochs, len(self.nodes)))
         else:

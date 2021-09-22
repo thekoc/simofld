@@ -10,24 +10,13 @@ from numpy import log2, random
 
 from . import envs
 from .model import Node, Channel, Profile as ABCProfile, SimulationEnvironment, Transmission
-from .masl import SIMULATION_PARAMETERS, RayleighChannel, create_env
+from .masl import SIMULATION_PARAMETERS, RayleighChannel, create_env, MobileUser as MASLMobileUser
 logger = getLogger(__name__)
 
 
-class MobileUser(Node):
-    def __init__(self, channels: List[Channel], distance: Number, active_probability: Number) -> None:
-        super().__init__()
-        self.channels = channels
-        self._x = distance
-        self.transmit_power = SIMULATION_PARAMETERS['TRANSMIT_POWER'] # p_i
-        self.active = None
-        self.cpu_frequency = SIMULATION_PARAMETERS['LOCAL_CPU_CAPABILITY'][0] # Megacycles/s
-        self.cpu_effeciency = SIMULATION_PARAMETERS['COMPUTING_ENERGY_EFFECIENCY'][0] # Megacycles/J TODO: Random selection
-        self.active_probability = active_probability
-        self._datasize = SIMULATION_PARAMETERS['DATA_SIZE']
-        self._choice_index = None
-        self._payoff_weight_energy = random.random()
-        self._payoff_weight_time = 1 - self._payoff_weight_energy
+class MobileUser(MASLMobileUser):
+    def __init__(self, channels: List[RayleighChannel], distance: Optional[Number]=None, active_probability: Optional[Number]=None, run_until: Optional[Number]=None, enable_dueling=False) -> None:
+        super().__init__(channels=channels, distance=distance, active_probability=active_probability)
 
     async def perform_cloud_computation(self, cloud_server: 'CloudServer', channel: Channel, upload_duration: Number, datarate: Number):
         env = self.get_current_env()
@@ -172,7 +161,7 @@ class CloudServer(Node):
 class Profile(ABCProfile):
     """This is the class to profile the system.
     """
-    def __init__(self, nodes: List[MobileUser], sample_interval: Number) -> None:
+    def __init__(self, nodes: List[MobileUser], sample_interval: Number, no_sample_until=None) -> None:
         self.nodes = nodes
 
         # Prepare vectors for system-wide cost calculation
@@ -182,7 +171,7 @@ class Profile(ABCProfile):
         self._system_wide_cost_samples = []
         self._node_choices = [[] for _ in nodes]
         self._last_sample_ts = None
-        super().__init__(sample_interval)
+        super().__init__(sample_interval, no_sample_until)
         
     def sample(self):
         logger.info(f'Sampling..., now: {envs.get_current_env().now}')
