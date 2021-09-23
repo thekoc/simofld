@@ -21,7 +21,7 @@ class MobileUser(MASLMobileUser):
         cloud_server = self._get_cloud_server()
         step_interval = self.get_current_env().g.step_interval
         while True:
-            self._choice_index = random.randint(0, len(self.channels) + 1).item()
+            self._choice_index = random.randint(0, len(self.channels) + 1)
             await envs.wait_for_simul_tasks()
             if last_transmission:
                 last_transmission.disconnect()

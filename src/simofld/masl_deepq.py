@@ -18,7 +18,7 @@ logger = getLogger(__name__)
 
 
 class DQNAgent:
-    def __init__(self, state_size, action_size):
+    def __init__(self, state_size, action_size, enable_dueling=None):
         self.state_size = state_size
         self.action_size = action_size
         self.memory = deque(maxlen=128)
@@ -29,7 +29,7 @@ class DQNAgent:
         self.epsilon_decay_factor = 0.99
         self.learning_rate = 0.03
         self.model = self._build_model()
-        self.target_model = self._build_model()
+        self.target_model = self._build_model(enable_dueling)
 
     def _build_model(self, enable_dueling=False):
         if enable_dueling:
@@ -126,6 +126,7 @@ class MobileUser(MASLMobileUser):
     def __init__(self, channels: List[RayleighChannel], distance: Optional[Number]=None, active_probability: Optional[Number]=None, run_until: Optional[Number]=None, enable_dueling=False) -> None:
         super().__init__(channels=channels, distance=distance, active_probability=active_probability)
         self.payoff_logs = deque(maxlen=100)
+        self._run_until = None
         self.dqn_agent = DQNAgent(state_size=len(self.channels) + 1, action_size=len(self.channels) + 1, enable_dueling=enable_dueling)
 
     def reward(self, choice_index):
@@ -175,7 +176,6 @@ class MobileUser(MASLMobileUser):
 
             state = self.get_state()
             self._choice_index = self.dqn_agent.act(state)
-            print(self._choice_index)
             await envs.wait_for_simul_tasks()
             if last_transmission:
                 last_transmission.disconnect()

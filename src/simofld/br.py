@@ -10,7 +10,7 @@ from numpy import log2, random
 
 from . import envs
 from .model import Node, Channel, Profile as ABCProfile, SimulationEnvironment, Transmission
-from .masl import SIMULATION_PARAMETERS, RayleighChannel, create_env, MobileUser as MASLMobileUser
+from .masl import SIMULATION_PARAMETERS, RayleighChannel, create_env, MobileUser as MASLMobileUser, Profile as MASLProfile
 logger = getLogger(__name__)
 
 
@@ -157,102 +157,5 @@ class CloudServer(Node):
         
         return await task
 
-
-class Profile(ABCProfile):
-    """This is the class to profile the system.
-    """
-    def __init__(self, nodes: List[MobileUser], sample_interval: Number, no_sample_until=None) -> None:
-        self.nodes = nodes
-
-        # Prepare vectors for system-wide cost calculation
-        alpha = SIMULATION_PARAMETERS['PATH_LOSS_EXPONENT']
-        self.channel_powers_0 = np.array([node._x**(-alpha) * node.transmit_power for node in nodes]) # channel powers divied by respective rayleigh fading factors
-
-        self._system_wide_cost_samples = []
-        self._node_choices = [[] for _ in nodes]
-        self._last_sample_ts = None
-        super().__init__(sample_interval, no_sample_until)
-        
-    def sample(self):
-        logger.info(f'Sampling..., now: {envs.get_current_env().now}')
-
-        now = time.time()
-        if self._last_sample_ts is not None:
-            logger.info(f'It takes {now - self._last_sample_ts} secs per iteration')
-        self._last_sample_ts = now
-
-        logger.debug(f'Channel: 0')
-    
-        # for node in self.nodes:
-        #     cloud_server = envs.get_current_env().g.cloud_server
-        #     for channel in node.channels:
-        #         logger.info(f'DR for node {node.id} using channel {channel.id}: {channel.datarate_between(node, cloud_server)}')
-            
-        for node in self.nodes:
-            if node._choice_index == 0:
-                logger.debug(f'{node.id}, {node._x:.0f}')
-                
-        channels = self.nodes[0].channels
-        for channel in channels:
-            logger.debug(f'Channel: {channel.id}')
-            for transmission in channel.transmission_list:
-                logger.debug(f'{transmission.from_node.id}, {transmission.from_node._x:.0f}')
-        
-        nodes = self.nodes
-        for i, node in enumerate(nodes):
-            self._node_choices[i].append(node._choice_index)
-        result = self.system_wide_cost_vectorized()
-        logger.debug(f'cost: {result}')
-        self._system_wide_cost_samples.append(result)
-    
-    def system_wide_cost_vectorized(self) -> Number:
-        """The system wide cost (vectorized version)
-
-        Returns:
-            Number: System wide cost.
-        """
-        epochs = 1000
-
-        betas: np.ndarray = random.standard_exponential((epochs, len(self.nodes)))
-        # betas = np.ceil(betas * 2) / 2
-
-        active_probabilities = np.array([node.active_probability for node in self.nodes])
-        activeness_v: np.ndarray = random.random((epochs, len(self.nodes))) < active_probabilities
-
-        channel_powers: np.ndarray = self.channel_powers_0 * betas
-        assert channel_powers.shape == (epochs, len(self.nodes))
-
-        active_channel_powers = channel_powers * activeness_v
-        
-        channels = self.nodes[0].channels
-        channel_nodes = np.zeros((len(channels), len(self.nodes)), dtype='bool')
-        for j, node in enumerate(self.nodes):
-            i = node._choice_index - 1
-            if i >= 0:
-                channel_nodes[i][j] = True
-
-        total_channel_powers = np.empty((epochs, len(channels)))
-        for i, nodes_bool in enumerate(channel_nodes):
-            total_channel_powers[:, i] = np.sum(active_channel_powers, axis=1, where=nodes_bool)
-
-        total_channel_powers_for_nodes = np.zeros_like(channel_powers)
-        for i, node in enumerate(self.nodes):
-            j = node._choice_index - 1
-            if j >= 0:
-                total_channel_powers_for_nodes[:, i] = total_channel_powers[:, j]
-
-        B = SIMULATION_PARAMETERS['CHANNEL_BANDWITH']
-        sigma_0 = SIMULATION_PARAMETERS['BACKGROUND_NOISE']
-        datarates: np.ndarray = B * log2(1 + (channel_powers / (total_channel_powers_for_nodes + sigma_0 - active_channel_powers)))
-
-        avg_datarates = np.average(datarates, axis=0)
-
-        total_cost = 0
-        for i, node in enumerate(self.nodes):
-            if node._choice_index == 0:
-                total_cost += node.active_probability * node.local_cost()
-                logger.debug(f'local cost for {node.id}: {node.local_cost()}')
-            else:
-                total_cost += node.active_probability * node.cloud_cost(avg_datarates[i])
-                logger.debug(f'cloud cost for {node.id}: {node.cloud_cost(avg_datarates[i])}')
-        return total_cost
+class Profile(MASLProfile):
+    pass

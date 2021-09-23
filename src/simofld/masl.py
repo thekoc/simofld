@@ -18,8 +18,6 @@ from .model import Node, Channel, Profile as ABCProfile, SimulationEnvironment, 
 SIMULATION_PARAMETERS = {
     # CHART
     'AP_COVERAGE': 40, # meter
-
-    'CHANNEL_NUM': 10,
     'CHANNEL_BANDWITH': 5e6, # MHz
     'TRANSMIT_POWER': 100e-3, # mW
     'PATH_LOSS_EXPONENT': 4,
