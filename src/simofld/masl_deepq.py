@@ -23,12 +23,14 @@ class DQNAgent:
         self.action_size = action_size
         self.memory = deque(maxlen=200)
         self.gamma = 0.8  # discount rate
-        self.alpha = 0.8 # Q learning rate
-        self.epsilon = 0.01  # exploration rate
+        self.alpha = 0.9 # Q learning rate
+        self.epsilon = 0.1  # exploration rate
         self.epsilon_min = 0.01
         self.epsilon_decay_factor = 0.99
         self.learning_rate = 0.03
-        self.model = self._build_model()
+        if enable_dueling is None:
+            enable_dueling = SIMULATION_PARAMETERS.get('ENABLE_DUELING', False)
+        self.model = self._build_model(enable_dueling)
         self.target_model = self._build_model(enable_dueling)
 
     def _build_model(self, enable_dueling=False):
@@ -46,7 +48,7 @@ class DQNAgent:
             X = keras.layers.Dense(6, activation="relu", kernel_initializer='he_uniform')(X)
             
             # Hidden layer with 64 nodes
-            # X = keras.layers.Dense(3, activation="relu", kernel_initializer='he_uniform')(X)
+            X = keras.layers.Dense(3, activation="relu", kernel_initializer='he_uniform')(X)
 
             state_value = keras.layers.Dense(1, kernel_initializer='he_uniform')(X)
             state_value = keras.layers.Lambda(lambda s: K.expand_dims(s[:, 0], -1), output_shape=output_shape)(state_value)
@@ -66,7 +68,7 @@ class DQNAgent:
             init = tf.keras.initializers.he_uniform()
             model = keras.Sequential()
             model.add(keras.layers.Dense(12, input_dim=self.state_size, activation='relu', kernel_initializer=init))
-            model.add(keras.layers.Dense(6, activation='relu', kernel_initializer=init))
+            model.add(keras.layers.Dense(8, activation='relu', kernel_initializer=init))
             model.add(keras.layers.Dense(self.action_size, activation='linear', kernel_initializer=init))
             model.compile(loss=tf.keras.losses.Huber(), optimizer=tf.keras.optimizers.Adam(lr=self.learning_rate), metrics=['accuracy'])
             return model

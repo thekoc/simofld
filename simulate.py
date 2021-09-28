@@ -26,10 +26,17 @@ def run_simulation(algorithm: str, user_num: int, channel_num: int, until: Numbe
         profile_no_sample_until = kwargs['profile_no_sample_until']
     else:
         profile_no_sample_until = None
+
+    if algorithm == 'dueling_double_dqn':
+        masl.SIMULATION_PARAMETERS['ENABLE_DUELING'] = True
+    elif algorithm == 'double_dqn':
+        masl.SIMULATION_PARAMETERS['ENABLE_DUELING'] = False
+    
     algorithm_to_model = {
         'br': br,
         'masl': masl,
         'double_dqn': masl_deepq,
+        'dueling_double_dqn': masl_deepq,
         'random': random_selection,
         'local': always_local,
     }
@@ -125,21 +132,30 @@ def test_different_channel_numbers(algorithm, repeat=250):
         json.dump(results, f)
 
 
-parameters1 = [
-    {'group': 'gamma', 'type': 'convergence', 'algorithm': 'masl', 'gamma': 1e4, 'label': f'{1e3}', 'lr': 0.1, 'user_num': 20, 'channel_num': 5, 'until': 500,},
-    {'group': 'gamma', 'type': 'convergence', 'algorithm': 'masl', 'gamma': 1e5, 'label': f'{1e4}', 'lr': 0.1, 'user_num': 20, 'channel_num': 5, 'until': 500,},
-    {'group': 'gamma', 'type': 'convergence', 'algorithm': 'masl', 'gamma': 1e6, 'label': f'{1e5}', 'lr': 0.1, 'user_num': 20, 'channel_num': 5, 'until': 500,},
-    {'group': 'gamma', 'type': 'convergence', 'algorithm': 'masl', 'gamma': 1e7, 'label': f'{1e6}', 'lr': 0.1, 'user_num': 20, 'channel_num': 5, 'until': 500,},
+parameters_gamma = [
+    {'group': 'gamma', 'type': 'convergence', 'algorithm': 'masl', 'gamma': 1e3, 'label': f'gamma: {1e3}', 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 500,},
+    {'group': 'gamma', 'type': 'convergence', 'algorithm': 'masl', 'gamma': 1e4, 'label': f'gamma: {1e4}', 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 500,},
+    {'group': 'gamma', 'type': 'convergence', 'algorithm': 'masl', 'gamma': 1e5, 'label': f'gamma: {1e5}', 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 500,},
+    {'group': 'gamma', 'type': 'convergence', 'algorithm': 'masl', 'gamma': 1e6, 'label': f'gamma: {1e6}', 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 500,},
+]
+
+parameters_lr = [
+    {'group': 'gamma', 'type': 'convergence', 'algorithm': 'masl', 'gamma': 1e5, 'label': f'lr: {0.05}', 'lr': 0.05, 'user_num': 30, 'channel_num': 5, 'until': 500,},
+    {'group': 'gamma', 'type': 'convergence', 'algorithm': 'masl', 'gamma': 1e5, 'label': f'lr: {0.1}', 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 500,},
+    {'group': 'gamma', 'type': 'convergence', 'algorithm': 'masl', 'gamma': 1e5, 'label': f'lr: {0.2}', 'lr': 0.2, 'user_num': 30, 'channel_num': 5, 'until': 500,},
+    {'group': 'gamma', 'type': 'convergence', 'algorithm': 'masl', 'gamma': 1e5, 'label': f'lr: {0.3}', 'lr': 0.3, 'user_num': 30, 'channel_num': 5, 'until': 500,},
 ]
 
 if __name__ == '__main__':
+    repeat = 500
+    test_different_parameters(parameters_gamma, suffix='gamma', repeat=repeat)
+    test_different_parameters(parameters_lr, suffix='lr', repeat=repeat)
+    test_different_channel_numbers('masl', repeat=repeat)
+    test_different_user_numbers('masl', repeat=repeat)
+    test_different_channel_numbers('br', repeat=repeat)
+    test_different_user_numbers('br', repeat=repeat)
+    test_different_channel_numbers('random', repeat=repeat)
+    test_different_user_numbers('random', repeat=repeat)
+    test_different_channel_numbers('local', repeat=repeat)
+    test_different_user_numbers('local', repeat=repeat)
     test_different_parameters([{'group': 'dq', 'type': 'convergence', 'algorithm': 'double_dqn', 'label': f'double dqn', 'lr': 0.1, 'user_num': 20, 'channel_num': 5, 'until': 500,}], suffix='dq', repeat=8)
-    # test_different_parameters(parameters1, suffix='masl-gamma', repeat=250)
-    # test_different_channel_numbers('masl', 250)
-    # test_different_user_numbers('masl', 250)
-    # test_different_channel_numbers('br', 250)
-    # test_different_user_numbers('br', 250)
-    # test_different_channel_numbers('random', 250)
-    # test_different_user_numbers('random', 250)
-    # test_different_channel_numbers('local', 250)
-    # test_different_user_numbers('local', 250)
