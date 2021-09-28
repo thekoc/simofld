@@ -54,7 +54,7 @@ def run_simulation(algorithm: str, user_num: int, channel_num: int, until: Numbe
     
     final_beneficial_user_num = 0
     for i, u in enumerate(users):
-        if u._choice_index != 0 and profile._node_costs[i][-1] < u.local_cost():
+        if u._choice_index != 0 and profile._node_costs[i][-1] < u.local_cost() * u.active_probability:
             final_beneficial_user_num += 1
     
     result = {
@@ -93,12 +93,12 @@ def test_different_parameters(parameters, suffix='', repeat=500):
 
 def test_different_user_numbers(algorithm, repeat=250):
     parameters = [
-        {'group': 'user_num', 'algorithm': algorithm, 'gamma': 1e5, 'lr': 0.1, 'user_num': 10, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
-        {'group': 'user_num', 'algorithm': algorithm, 'gamma': 1e5, 'lr': 0.1, 'user_num': 15, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
-        {'group': 'user_num', 'algorithm': algorithm, 'gamma': 1e5, 'lr': 0.1, 'user_num': 20, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
-        {'group': 'user_num', 'algorithm': algorithm, 'gamma': 1e5, 'lr': 0.1, 'user_num': 25, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
-        {'group': 'user_num', 'algorithm': algorithm, 'gamma': 1e5, 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
-        {'group': 'user_num', 'algorithm': algorithm, 'gamma': 1e5, 'lr': 0.1, 'user_num': 35, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
+        {'group': 'user_num', 'type': 'user_num', 'algorithm': algorithm, 'gamma': 1e6, 'lr': 0.1, 'user_num': 10, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
+        {'group': 'user_num', 'type': 'user_num', 'algorithm': algorithm, 'gamma': 1e6, 'lr': 0.1, 'user_num': 15, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
+        {'group': 'user_num', 'type': 'user_num', 'algorithm': algorithm, 'gamma': 1e6, 'lr': 0.1, 'user_num': 20, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
+        {'group': 'user_num', 'type': 'user_num', 'algorithm': algorithm, 'gamma': 1e6, 'lr': 0.1, 'user_num': 25, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
+        {'group': 'user_num', 'type': 'user_num', 'algorithm': algorithm, 'gamma': 1e6, 'lr': 0.1, 'user_num': 30, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
+        {'group': 'user_num', 'type': 'user_num', 'algorithm': algorithm, 'gamma': 1e6, 'lr': 0.1, 'user_num': 35, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
     ]
     results = []
     for parameter in parameters:
@@ -110,12 +110,12 @@ def test_different_user_numbers(algorithm, repeat=250):
 def test_different_channel_numbers(algorithm, repeat=250):
     user_num = 20
     parameters = [
-        {'group': 'channel_num', 'algorithm': algorithm, 'gamma': 1e5, 'lr': 0.1, 'user_num': user_num, 'channel_num': 4, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
-        {'group': 'channel_num', 'algorithm': algorithm, 'gamma': 1e5, 'lr': 0.1, 'user_num': user_num, 'channel_num': 6, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
-        {'group': 'channel_num', 'algorithm': algorithm, 'gamma': 1e5, 'lr': 0.1, 'user_num': user_num, 'channel_num': 8, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
-        {'group': 'channel_num', 'algorithm': algorithm, 'gamma': 1e5, 'lr': 0.1, 'user_num': user_num, 'channel_num': 10, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
-        {'group': 'channel_num', 'algorithm': algorithm, 'gamma': 1e5, 'lr': 0.1, 'user_num': user_num, 'channel_num': 12, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
-        {'group': 'channel_num', 'algorithm': algorithm, 'gamma': 1e5, 'lr': 0.1, 'user_num': user_num, 'channel_num': 14, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
+        {'group': 'channel_num', 'type': 'channel_num', 'algorithm': algorithm, 'gamma': 1e6, 'lr': 0.1, 'user_num': user_num, 'channel_num': 4, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
+        {'group': 'channel_num', 'type': 'channel_num', 'algorithm': algorithm, 'gamma': 1e6, 'lr': 0.1, 'user_num': user_num, 'channel_num': 6, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
+        {'group': 'channel_num', 'type': 'channel_num', 'algorithm': algorithm, 'gamma': 1e6, 'lr': 0.1, 'user_num': user_num, 'channel_num': 8, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
+        {'group': 'channel_num', 'type': 'channel_num', 'algorithm': algorithm, 'gamma': 1e6, 'lr': 0.1, 'user_num': user_num, 'channel_num': 10, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
+        {'group': 'channel_num', 'type': 'channel_num', 'algorithm': algorithm, 'gamma': 1e6, 'lr': 0.1, 'user_num': user_num, 'channel_num': 12, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
+        {'group': 'channel_num', 'type': 'channel_num', 'algorithm': algorithm, 'gamma': 1e6, 'lr': 0.1, 'user_num': user_num, 'channel_num': 14, 'until': 500, 'profile_sample_interval': 500, 'profile_no_sample_until': 500},
     ]
     results = []
     for parameter in parameters:
@@ -133,12 +133,13 @@ parameters1 = [
 ]
 
 if __name__ == '__main__':
-    test_different_parameters(parameters1, suffix='masl-gamma', repeat=250)
-    test_different_channel_numbers('masl', 250)
-    test_different_user_numbers('masl', 250)
-    test_different_channel_numbers('br', 250)
-    test_different_user_numbers('br', 250)
-    test_different_channel_numbers('random', 250)
-    test_different_user_numbers('random', 250)
-    test_different_channel_numbers('local', 250)
-    test_different_user_numbers('local', 250)
+    test_different_parameters([{'group': 'dq', 'type': 'convergence', 'algorithm': 'double_dqn', 'label': f'double dqn', 'lr': 0.1, 'user_num': 20, 'channel_num': 5, 'until': 500,}], suffix='dq', repeat=8)
+    # test_different_parameters(parameters1, suffix='masl-gamma', repeat=250)
+    # test_different_channel_numbers('masl', 250)
+    # test_different_user_numbers('masl', 250)
+    # test_different_channel_numbers('br', 250)
+    # test_different_user_numbers('br', 250)
+    # test_different_channel_numbers('random', 250)
+    # test_different_user_numbers('random', 250)
+    # test_different_channel_numbers('local', 250)
+    # test_different_user_numbers('local', 250)

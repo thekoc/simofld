@@ -346,7 +346,7 @@ def run_dq_wrapper(p_dict: dict):
 def test_dq():
     parameters = [
         {
-            'group': 'deep_q_learning', 'user_num': 30, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 10
+            'group': 'deep_q_learning', 'user_num': 20, 'channel_num': 5, 'until': 500, 'profile_sample_interval': 10
         }
     ]
     with Pool(os.cpu_count()) as pool:

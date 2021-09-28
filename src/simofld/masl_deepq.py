@@ -21,9 +21,9 @@ class DQNAgent:
     def __init__(self, state_size, action_size, enable_dueling=None):
         self.state_size = state_size
         self.action_size = action_size
-        self.memory = deque(maxlen=128)
-        self.gamma = 0.9  # discount rate
-        self.alpha = 0.7 # Q learning rate
+        self.memory = deque(maxlen=200)
+        self.gamma = 0.8  # discount rate
+        self.alpha = 0.8 # Q learning rate
         self.epsilon = 0.01  # exploration rate
         self.epsilon_min = 0.01
         self.epsilon_decay_factor = 0.99
@@ -152,7 +152,7 @@ class MobileUser(MASLMobileUser):
             weight = 1 
             state = np.zeros(len(self.channels) + 1)
             for i in range(recent_n):
-                state += 1e5 * weight * np.array(self.payoff_logs[-(i+1)])
+                state += 1e6 * weight * np.array(self.payoff_logs[-(i+1)])
                 weight *= 0.98
             state = state.clip(0, 50)
             return state
@@ -169,7 +169,6 @@ class MobileUser(MASLMobileUser):
         self._choice_index = random.randint(0, len(self.channels) + 1)
         update_count = 0
         epsilon_decay_started = False
-        self._choice_index = random.choice(len(self.channels) + 1, 1).item() 
         while True:
             if self._run_until is not None and self.get_current_env().now > self._run_until:
                 break

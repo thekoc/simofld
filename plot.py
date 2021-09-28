@@ -66,28 +66,28 @@ if __name__ == '__main__':
                 ax.plot(X, Y, label=a)
             ax.legend()
 
-        if channel_num_results:
-            for group in set(r['group'] for r in channel_num_results):
-                group_results = [r for r in channel_num_results if r['group'] == group]
-                algorithms = set(r['algorithm'] for r in group_results)
+    if channel_num_results:
+        for group in set(r['group'] for r in channel_num_results):
+            group_results = [r for r in channel_num_results if r['group'] == group]
+            algorithms = set(r['algorithm'] for r in group_results)
 
-                fig, ax = plt.subplots()
-                ax.set_ylabel('System wide cost')
-                ax.set_xlabel('Channel number')
-                for a in algorithms:
-                    X = [r['channel_num'] for r in group_results if r['algorithm'] == a]
-                    Y = [r['result']['final_system_cost'] for r in group_results if r['algorithm'] == a]
-                    ax.plot(X, Y, label=a)
-                ax.legend()
+            fig, ax = plt.subplots()
+            ax.set_ylabel('System wide cost')
+            ax.set_xlabel('Channel number')
+            for a in algorithms:
+                X = [r['channel_num'] for r in group_results if r['algorithm'] == a]
+                Y = [r['result']['final_system_cost'] for r in group_results if r['algorithm'] == a]
+                ax.plot(X, Y, label=a)
+            ax.legend()
 
-                fig, ax = plt.subplots()
-                ax.set_ylabel('Beneficial user')
-                ax.set_xlabel('Channel number')
-                for a in algorithms:
-                    X = [r['channel_num'] for r in group_results if r['algorithm'] == a]
-                    Y = [r['result']['final_beneficial_user_num'] for r in group_results if r['algorithm'] == a]
-                    ax.plot(X, Y, label=a)
-                ax.legend()
+            fig, ax = plt.subplots()
+            ax.set_ylabel('Beneficial user')
+            ax.set_xlabel('Channel number')
+            for a in algorithms:
+                X = [r['channel_num'] for r in group_results if r['algorithm'] == a]
+                Y = [r['result']['final_beneficial_user_num'] for r in group_results if r['algorithm'] == a]
+                ax.plot(X, Y, label=a)
+            ax.legend()
 
     plt.tight_layout()
     plt.show()
